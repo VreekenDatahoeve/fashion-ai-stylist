@@ -20,7 +20,7 @@ link_qs = (qp.get("u", "") or "").strip()             # product-URL uit bookmark
 auto = str(qp.get("auto", "0")) == "1"                # auto-run toggle
 
 # --- Bookmarklet uitleg/knop (VUL JE EIGEN URL IN) ---
-APP_URL = "https://<jouw-subdomein>.streamlit.app"    # <-- vervang dit!
+APP_URL = "https://fashion-ai-stylis-ifidobqmkgjtn7gjxgrudb.streamlit.app/"
 bookmarklet = (
     f"javascript:(()=>{{window.open('{APP_URL}/?u='+encodeURIComponent(location.href)+'&auto=1','_blank');}})();"
 )
