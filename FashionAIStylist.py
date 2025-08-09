@@ -44,7 +44,7 @@ st.write("Plak een link naar een kledingstuk of gebruik de bookmarklet. Beantwoo
 def run_advice(link, lichaamsvorm, huidskleur, lengte, gelegenheid, gevoel):
     prompt = f"""
 Je bent een ervaren fashion stylist. Analyseer dit kledingstuk: {link}
-Profiel: figuur={licchaamsvorm}, huidskleur={huidskleur}, lengte={lengte},
+Profiel: figuur={lichaamsvorm}, huidskleur={huidskleur}, lengte={lengte},
 gelegenheid={gelegenheid}, intentie={gevoel}.
 Geef ALLEEN markdown met exact deze kopjes:
 ## Beoordeling (kort)
