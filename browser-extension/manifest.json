@@ -1,0 +1,9 @@
+{
+  "name": "Fashion AI Stylist",
+  "version": "0.1",
+  "manifest_version": 3,
+  "description": "Open de huidige productpagina in Fashion AI Stylist.",
+  "permissions": ["activeTab", "contextMenus", "scripting"],
+  "action": { "default_title": "Open in Fashion AI Stylist" },
+  "background": { "service_worker": "background.js" }
+}
