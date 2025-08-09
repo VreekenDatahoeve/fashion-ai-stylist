@@ -14,21 +14,30 @@ client = OpenAI(api_key=API_KEY)
 # --- Pagina-instellingen ---
 st.set_page_config(page_title="AI Stylingadvies", page_icon="👗", layout="centered")
 
-# --- Query params (bookmarklet) ---  ✅ nieuwe API
+# --- Query params (bookmarklet) ---
 qp = st.query_params
-link_qs = (qp.get("u", "") or "").strip()             # product-URL uit bookmarklet
-auto = str(qp.get("auto", "0")) == "1"                # auto-run toggle
 
-# --- Bookmarklet uitleg/knop (VUL JE EIGEN URL IN) ---
-APP_URL = "https://fashion-ai-stylis-ifidobqmkgjtn7gjxgrudb.streamlit.app/"
-bookmarklet = (
-    f"javascript:(()=>{{window.open('{APP_URL}/?u='+encodeURIComponent(location.href)+'&auto=1','_blank');}})();"
+_u = qp.get("u", "")
+_u = _u[0] if isinstance(_u, list) else _u
+link_qs = (_u or "").strip()
+
+_a = qp.get("auto", "0")
+_a = _a[0] if isinstance(_a, list) else _a
+auto = str(_a) == "1"
+
+# --- Bookmarklet uitleg/knop (zelfde-tab variant; geen pop-up nodig) ---
+APP_URL = "https://fashion-ai-stylis-ifidobqmkgjtn7gjxgrudb.streamlit.app"  # <— jouw echte URL (géén trailing slash)
+bookmarklet_js = (
+    f"javascript:(()=>{{location.href='{APP_URL}?u='+encodeURIComponent(location.href)+'&auto=1';}})();"
 )
+
 st.markdown(
-    f'**Bookmarklet:** sleep deze <a href="{bookmarklet}">AI-stylist</a> naar je bladwijzerbalk en klik erop op een productpagina.',
+    f'**Bookmarklet:** sleep deze <a href="{bookmarklet_js}">AI-stylist</a> naar je bladwijzerbalk '
+    f'of maak hem handmatig door onderstaande regel als URL van een bladwijzer te plakken.',
     unsafe_allow_html=True
 )
-st.caption("Tip: bladwijzerbalk aanzetten met Ctrl+Shift+B (Mac: Cmd+Shift+B).")
+st.text_input("Bookmarklet-URL", value=bookmarklet_js, label_visibility="collapsed")
+st.caption("Tip: zet je bladwijzerbalk aan met Ctrl+Shift+B (Mac: Cmd+Shift+B).")
 
 st.title("👗 AI Stylingadvies op basis van kledinglink")
 st.write("Plak een link naar een kledingstuk of gebruik de bookmarklet. Beantwoord een paar korte vragen voor persoonlijk advies.")
@@ -74,8 +83,11 @@ if link_qs and auto:
 else:
     # --- Formulier (handmatige invoer) ---
     with st.form("kledingadvies_form"):
-        link = st.text_input("🔗 Plak hier de link naar het kledingstuk",
-                             value=link_qs or "", placeholder="https://...")
+        link = st.text_input(
+            "🔗 Plak hier de link naar het kledingstuk",
+            value=link_qs or "",
+            placeholder="https://..."
+        )
         col1, col2, col3 = st.columns(3)
         with col1:
             lichaamsvorm = st.selectbox("👤 Lichaamsvorm", ["Zandloper", "Peer", "Rechthoek", "Appel", "Weet ik niet"])
