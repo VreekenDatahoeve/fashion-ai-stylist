@@ -26,17 +26,15 @@ _a = _a[0] if isinstance(_a, list) else _a
 auto = str(_a) == "1"
 
 # --- Bookmarklet uitleg/knop (zelfde-tab variant; geen pop-up nodig) ---
-APP_URL = "https://fashion-ai-stylis-ifidobqmkgjtn7gjxgrudb.streamlit.app"  # <— jouw echte URL (géén trailing slash)
+APP_URL = "https://fashion-ai-stylis-ifidobqmkgjtn7gjxgrudb.streamlit.app"  # géén trailing slash
 bookmarklet_js = (
     f"javascript:(()=>{{location.href='{APP_URL}?u='+encodeURIComponent(location.href)+'&auto=1';}})();"
 )
 
 st.markdown(
-    f'**Bookmarklet:** sleep deze <a href="{bookmarklet_js}">AI-stylist</a> naar je bladwijzerbalk '
-    f'of maak hem handmatig door onderstaande regel als URL van een bladwijzer te plakken.',
+    f'**Bookmarklet:** sleep deze <a href="{bookmarklet_js}">AI-stylist</a> naar je bladwijzerbalk en klik erop op een productpagina.',
     unsafe_allow_html=True
 )
-st.text_input("Bookmarklet-URL", value=bookmarklet_js, label_visibility="collapsed")
 st.caption("Tip: zet je bladwijzerbalk aan met Ctrl+Shift+B (Mac: Cmd+Shift+B).")
 
 st.title("👗 AI Stylingadvies op basis van kledinglink")
@@ -46,7 +44,7 @@ st.write("Plak een link naar een kledingstuk of gebruik de bookmarklet. Beantwoo
 def run_advice(link, lichaamsvorm, huidskleur, lengte, gelegenheid, gevoel):
     prompt = f"""
 Je bent een ervaren fashion stylist. Analyseer dit kledingstuk: {link}
-Profiel: figuur={lichaamsvorm}, huidskleur={huidskleur}, lengte={lengte},
+Profiel: figuur={licchaamsvorm}, huidskleur={huidskleur}, lengte={lengte},
 gelegenheid={gelegenheid}, intentie={gevoel}.
 Geef ALLEEN markdown met exact deze kopjes:
 ## Beoordeling (kort)
