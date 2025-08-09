@@ -14,14 +14,16 @@ client = OpenAI(api_key=API_KEY)
 # --- Pagina-instellingen ---
 st.set_page_config(page_title="AI Stylingadvies", page_icon="👗", layout="centered")
 
-# --- Query params (bookmarklet) ---
-params = st.experimental_get_query_params()
-link_qs = (params.get("u", [""])[0] or "").strip()          # product-URL uit bookmarklet
-auto = (params.get("auto", ["0"])[0] == "1")                # auto-run toggle
+# --- Query params (bookmarklet) ---  ✅ nieuwe API
+qp = st.query_params
+link_qs = (qp.get("u", "") or "").strip()             # product-URL uit bookmarklet
+auto = str(qp.get("auto", "0")) == "1"                # auto-run toggle
 
-# --- Bookmarklet uitleg/knop (vervang APP_URL!) ---
-APP_URL = "https://https://fashion-ai-stylis-ifidobqmkgjtn7gjxgrudb.streamlit.app"  # <<< VERVANG DIT
-bookmarklet = f"javascript:(()=>{{window.open('{APP_URL}/?u='+encodeURIComponent(location.href)+'&auto=1','_blank');}})();"
+# --- Bookmarklet uitleg/knop (VUL JE EIGEN URL IN) ---
+APP_URL = "https://<jouw-subdomein>.streamlit.app"    # <-- vervang dit!
+bookmarklet = (
+    f"javascript:(()=>{{window.open('{APP_URL}/?u='+encodeURIComponent(location.href)+'&auto=1','_blank');}})();"
+)
 st.markdown(
     f'**Bookmarklet:** sleep deze <a href="{bookmarklet}">AI-stylist</a> naar je bladwijzerbalk en klik erop op een productpagina.',
     unsafe_allow_html=True
@@ -61,7 +63,6 @@ Geef ALLEEN markdown met exact deze kopjes:
 # --- Auto-run als link via bookmarklet komt ---
 if link_qs and auto:
     st.success("🔗 Link ontvangen via bookmarklet")
-    # Redelijke defaults zodat het direct draait
     run_advice(
         link_qs,
         lichaamsvorm="Weet ik niet",
@@ -73,7 +74,8 @@ if link_qs and auto:
 else:
     # --- Formulier (handmatige invoer) ---
     with st.form("kledingadvies_form"):
-        link = st.text_input("🔗 Plak hier de link naar het kledingstuk", placeholder="https://...")
+        link = st.text_input("🔗 Plak hier de link naar het kledingstuk",
+                             value=link_qs or "", placeholder="https://...")
         col1, col2, col3 = st.columns(3)
         with col1:
             lichaamsvorm = st.selectbox("👤 Lichaamsvorm", ["Zandloper", "Peer", "Rechthoek", "Appel", "Weet ik niet"])
