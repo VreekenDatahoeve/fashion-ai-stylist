@@ -1,8 +1,7 @@
-# .streamlit/config.toml
 [theme]
 base="light"
-primaryColor="#7C3AED"           # paars (modern)
+primaryColor="#7C3AED"
 backgroundColor="#FFFFFF"
 secondaryBackgroundColor="#F6F7FB"
 textColor="#111827"
-font="sans serif"                 # gebruiken we met Inter via CSS
+font="sans serif"
