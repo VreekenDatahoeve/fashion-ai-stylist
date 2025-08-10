@@ -17,15 +17,22 @@ if not API_KEY:
 client = OpenAI(api_key=API_KEY)
 
 # --- Pagina ---
-st.set_page_config(page_title="Fashion AI Stylist", page_icon="👗", layout="centered", initial_sidebar_state="collapsed")
+st.set_page_config(
+    page_title="Fashion AI Stylist",
+    page_icon="👗",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
 
-# ---------- CSS: mockup-stijl ----------
+# ---------- CSS: mockup-stijl (zonder banner/emoji) ----------
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
 
 html, body, [data-testid="stAppViewContainer"]{ height:100%; }
-html, body, [class*="stApp"]{ font-family:"Inter", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+html, body, [class*="stApp"]{
+  font-family:"Inter", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+}
 
 /* Paarse gradient background */
 [data-testid="stAppViewContainer"]{
@@ -36,18 +43,6 @@ footer { visibility:hidden; }
 
 /* Layout breedte */
 .block-container{ max-width: 860px; padding-top: 8px !important; padding-bottom: 96px !important; }
-
-/* BANNER bovenaan */
-.banner{
-  background: rgba(255,255,255,0.9);
-  color:#2d2a6c;
-  padding: 14px 18px;
-  border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(40,12,120,0.15);
-  backdrop-filter: blur(3px);
-  border:1px solid rgba(255,255,255,0.7);
-  font-weight: 600;
-}
 
 /* Cards */
 .card{
@@ -62,12 +57,8 @@ footer { visibility:hidden; }
   font-size: 24px; font-weight: 800; color:#2d2a6c; margin:0 0 8px;
   display:flex; gap:10px; align-items:center;
 }
-.card-title .emoji{
-  font-size: 22px; width:36px; height:36px; display:grid; place-items:center;
-  background:#EEF0FF; color:#5d59f6; border-radius:10px; flex:0 0 36px;
-}
 
-/* Bullets */
+/* Bullets (voor AI-output) */
 .section-label{ color:#2d2a6c; font-weight:800; margin-top:10px; margin-bottom:4px; }
 ul.clean{ list-style:none; padding-left:0; margin:0; }
 ul.clean li{ position:relative; padding-left:26px; margin:8px 0; color:#2b2b46; font-size:16px; }
@@ -95,9 +86,14 @@ ul.clean li::before{ content:"•"; position:absolute; left:6px; top:-1px; color
 .cta .dot{ width:10px; height:10px; border-radius:50%; background:#6F5BFF; box-shadow:0 0 0 6px rgba(111,91,255,.15); }
 
 /* Inputs */
-.stTextInput > div > div > input, .stSelectbox > div > div { border-radius:12px !important; min-height:42px; }
+.stTextInput > div > div > input, .stSelectbox > div > div {
+  border-radius:12px !important; min-height:42px;
+}
 
-/* Verberg standaard titelruimte */
+/* Verberg helperknop voor CTA toggle */
+button[id="_pf_toggle"]{ display:none !important; }
+
+/* Typografie */
 h1, h2, h3 { letter-spacing:-.02em; }
 </style>
 """, unsafe_allow_html=True)
@@ -115,12 +111,16 @@ auto    = str(_get("auto","0")) == "1"
 if "show_prefs" not in st.session_state:
     st.session_state.show_prefs = False
 
-st.button("_", key="_pf_toggle", help="", on_click=lambda: st.session_state.update(show_prefs=not st.session_state.show_prefs), type="secondary")
+st.button("_", key="_pf_toggle",
+          on_click=lambda: st.session_state.update(show_prefs=not st.session_state.show_prefs),
+          type="secondary")
+
 st.markdown("""
 <button class="cta" onClick="window.parent.postMessage({fab:1},'*')">
   <span class="dot"></span> Vertel iets over jezelf
 </button>
 """, unsafe_allow_html=True)
+
 st.components.v1.html("""
 <script>
 window.addEventListener('message',(e)=>{
@@ -226,48 +226,58 @@ Schrijf ALLEEN:
 
 # ---------- UI ----------
 
-# Korte modus (klein schakelaartje – niet in de kaart)
+# Schakelaar voor korte modus
 korte_modus = st.checkbox("Korte feedback (aanbevolen)", value=True)
 
-# Kaart 1: Kort advies
-st.markdown('<div class="card">', unsafe_allow_html=True)
-st.markdown('<div class="card-title">Kort advies</div>', unsafe_allow_html=True)
-
+# Advies vooraf ophalen als bookmarklet actief is
 rendered = False
+advies_md = ""
 if link_qs and auto:
     st.success("🔗 Link ontvangen via bookmarklet")
     advies_md = get_advice_md(link_qs, kort=korte_modus)
-    # toon advies in drie secties zoals mockup
-    st.markdown(advies_md)
     rendered = True
-st.markdown('</div>', unsafe_allow_html=True)
 
-# Kaart 2: Alternatieven
-st.markdown('<div class="card">', unsafe_allow_html=True)
-st.markdown('<div class="card-title"><span class="emoji">🔁</span>Alternatieven uit deze webshop</div>', unsafe_allow_html=True)
+# Kaart 1: Kort advies (één blok)
+st.markdown(f"""
+<div class="card">
+  <div class="card-title">Kort advies</div>
+  <div class="card-body">
+    {advies_md if rendered else ""}
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
+# Kaart 2: Alternatieven (één blok)
 alts = build_shop_alternatives(link_qs) if rendered else []
-if not alts:
-    st.markdown('<span style="color:#6B7280;">Er verschijnen alternatieven zodra je een productlink gebruikt.</span>', unsafe_allow_html=True)
-else:
-    st.markdown('<div class="pills">' + "".join([f"<a class='pill' href='{u}' target='_blank'>{t}</a>" for t, u in alts]) + "</div>", unsafe_allow_html=True)
-st.markdown('</div>', unsafe_allow_html=True)
+pills_html = "".join([f"<a class='pill' href='{u}' target='_blank'>{t}</a>" for t, u in alts])
+st.markdown(f"""
+<div class="card">
+  <div class="card-title">Alternatieven uit deze webshop</div>
+  <div class="card-body">
+    {pills_html if pills_html else "<span class='note' style='color:#6B7280;'>Er verschijnen alternatieven zodra je een productlink gebruikt.</span>"}
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
 # Handmatige invoer (onder de kaarten)
 with st.form("manual"):
     link = st.text_input("🔗 Of plak hier een link", value=link_qs or "", placeholder="https://…")
     go = st.form_submit_button("Vraag AI om advies")
-if go and link:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="card-title"><span class="emoji">👗</span>Kort advies</div>', unsafe_allow_html=True)
-    st.markdown(get_advice_md(link, kort=korte_modus))
-    st.markdown('</div>', unsafe_allow_html=True)
 
+if go and link:
+    advies2 = get_advice_md(link, kort=korte_modus)
     a2 = build_shop_alternatives(link)
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="card-title"><span class="emoji">🔁</span>Alternatieven uit deze webshop</div>', unsafe_allow_html=True)
-    if a2:
-        st.markdown('<div class="pills">' + "".join([f"<a class='pill' href='{u}' target='_blank'>{t}</a>" for t, u in a2]) + "</div>", unsafe_allow_html=True)
-    else:
-        st.markdown('<span style="color:#6B7280;">Geen alternatieven gevonden.</span>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    pills2 = "".join([f"<a class='pill' href='{u}' target='_blank'>{t}</a>" for t, u in a2])
+
+    st.markdown(f"""
+    <div class="card">
+      <div class="card-title">Kort advies</div>
+      <div class="card-body">{advies2}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Alternatieven uit deze webshop</div>
+      <div class="card-body">
+        {pills2 if pills2 else "<span class='note' style='color:#6B7280;'>Geen alternatieven gevonden.</span>"}
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
