@@ -7,7 +7,7 @@ from openai import OpenAI
 # ========= Instellingen =========
 APP_URL = "https://fashion-ai-stylis-ifidobqmkgjtn7gjxgrudb.streamlit.app"  # <-- JOUW URL (geen trailing slash)
 MODEL   = "gpt-4o-mini"
-SHOW_AVATAR = True   # zet op False om het poppetje te verbergen
+SHOW_AVATAR = True   # zet False om te verbergen
 # =================================
 
 # --- API key ---
@@ -65,20 +65,30 @@ footer { visibility:hidden; }
   box-shadow: 0 16px 40px rgba(23,0,75,0.18);
   border: 1px solid #F1ECFF;
   margin-top: 18px;
-  position: relative;
 }
 .card-title{
   font-size: 24px; font-weight: 800; color:#2d2a6c; margin:0 0 8px;
   display:flex; gap:10px; align-items:center;
 }
 
-/* Avatar (inline SVG) */
-.card .avatar {
-  position:absolute; right:16px; top:-8px;
-  width:160px; height:160px; opacity:.95;
+/* Advieskaart: tekst links, avatar rechts */
+.advice-grid{
+  display:grid;
+  grid-template-columns: 1fr 220px; /* avatarbreedte */
+  gap: 12px;
+  align-items: center;
 }
-@media (max-width: 640px){
-  .card .avatar{ width:120px; height:120px; top:-10px; right:6px; }
+.advice-copy{ min-width:0; }
+.avatar-box{ display:flex; justify-content:center; }
+.avatar-box svg{
+  width:100%; height:auto; border-radius:24px;
+  box-shadow: 0 10px 30px rgba(23,0,75,.15);
+}
+
+/* Responsive */
+@media (max-width: 720px){
+  .advice-grid{ grid-template-columns: 1fr; }
+  .avatar-box{ order:-1; margin-bottom: 8px; }
 }
 
 /* Pills */
@@ -103,7 +113,9 @@ footer { visibility:hidden; }
 .cta .dot{ width:10px; height:10px; border-radius:50%; background:#6F5BFF; box-shadow:0 0 0 6px rgba(111,91,255,.15); }
 
 /* Inputs */
-.stTextInput > div > div > input, .stSelectbox > div > div { border-radius:12px !important; min-height:42px; }
+.stTextInput > div > div > input, .stSelectbox > div > div {
+  border-radius:12px !important; min-height:42px;
+}
 
 h1, h2, h3 { letter-spacing:-.02em; }
 </style>
@@ -131,7 +143,6 @@ if st.session_state.show_prefs:
         lengte       = st.selectbox("Lengte",       ["< 1.60m","1.60 - 1.75m","> 1.75m"], index=1, key="pf_len")
         gelegenheid  = st.selectbox("Gelegenheid",  ["Werk","Feest","Vrije tijd","Bruiloft","Date"], index=2, key="pf_g")
         gevoel       = st.selectbox("Gevoel",       ["Zelfverzekerd","Speels","Elegant","Casual","Trendy"], index=3, key="pf_ge")
-        # Sluiten = queryparam verwijderen en herladen
         if st.button("Sluiten", use_container_width=True):
             st.session_state.show_prefs = False
             st.experimental_set_query_params(**{k:v for k,v in qp.items() if k!="prefs"})
@@ -139,7 +150,7 @@ if st.session_state.show_prefs:
 else:
     lichaamsvorm = "Weet ik niet"; huidskleur="Medium"; lengte="1.60 - 1.75m"; gelegenheid="Vrije tijd"; gevoel="Casual"
 
-# ---------- CTA onderin -> zet prefs=1 en reload (geen verborgen knop meer) ----------
+# ---------- CTA onderin -> zet prefs=1 en reload ----------
 st.markdown("""
 <button class="cta" onclick="
   const u = new URL(window.location);
@@ -154,7 +165,7 @@ st.markdown("""
 def _keywords_from_url(u: str):
     try:
         slug = urlparse(u).path.rstrip("/").split("/")[-1]
-        slug = re.sub(r"\d+", " ", slug)
+        slug = re.sub(r"\\d+", " ", slug)
         words = [w for w in re.split(r"[-_]+", slug) if w and len(w) > 1]
         return " ".join(words[:4]) or "fashion"
     except Exception:
@@ -162,7 +173,7 @@ def _keywords_from_url(u: str):
 
 def _product_name(u: str):
     kw = _keywords_from_url(u)
-    return re.sub(r"\s+", " ", kw).strip().title()
+    return re.sub(r"\\s+", " ", kw).strip().title()
 
 def _category_candidates(u: str):
     p = urlparse(u)
@@ -259,12 +270,9 @@ Use only simple, clear words (B1). No jargon. No emojis.
 
 # ---------- UI logic ----------
 korte_modus = True  # altijd kort en simpel
-
-# Voorbereiden ballon/advies
 rendered = False
 advies_md = ""
 balloon_html = ""
-
 OPENERS = ["Looks nice!", "Great pick!", "Nice choice!", "Love the vibe!", "Stylish pick!"]
 
 if link_qs and auto:
@@ -279,35 +287,40 @@ if link_qs and auto:
 if balloon_html:
     st.markdown(balloon_html, unsafe_allow_html=True)
 
-# --- Avatar SVG (inline, geen JS/iframe) ---
+# --- Mockup-achtige avatar (inline SVG) ---
 AVATAR_SVG = """
-<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
- <defs>
-  <radialGradient id="g" cx="60%" cy="30%" r="80%">
-    <stop offset="0%" stop-color="#c9d4ff"/>
-    <stop offset="60%" stop-color="#94a3ff"/>
-    <stop offset="100%" stop-color="#7a86ff"/>
-  </radialGradient>
- </defs>
- <g>
-  <rect x="0" y="0" width="200" height="200" rx="36" fill="url(#g)"/>
-  <circle cx="110" cy="70" r="22" fill="#F5C8A8"/>
-  <rect x="70" y="92" width="90" height="60" rx="28" fill="#6F79FF"/>
-  <circle cx="95" cy="66" r="4" fill="#633D2E"/>
-  <circle cx="125" cy="66" r="4" fill="#633D2E"/>
-  <path d="M100 78 Q110 86 120 78" stroke="#633D2E" stroke-width="3" fill="none" stroke-linecap="round"/>
- </g>
+<svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="60%" cy="30%" r="80%">
+      <stop offset="0%" stop-color="#c9d4ff"/>
+      <stop offset="60%" stop-color="#9fb0ff"/>
+      <stop offset="100%" stop-color="#7a86ff"/>
+    </radialGradient>
+  </defs>
+  <g>
+    <rect x="0" y="0" width="220" height="220" rx="36" fill="url(#bg)"/>
+    <!-- simpele zittende figuur -->
+    <circle cx="120" cy="72" r="24" fill="#F6C8A7"/>
+    <rect x="76" y="98" width="110" height="70" rx="32" fill="#6F79FF"/>
+    <path d="M92 158 Q120 170 148 158" fill="#4C55D8"/>
+    <circle cx="112" cy="70" r="4" fill="#5a3b2e"/>
+    <circle cx="130" cy="70" r="4" fill="#5a3b2e"/>
+    <path d="M112 82 Q121 88 130 82" stroke="#5a3b2e" stroke-width="3" fill="none" stroke-linecap="round"/>
+  </g>
 </svg>
 """
 
-# Kaart 1: Kort advies
-avatar_html = f"<div class='avatar'>{AVATAR_SVG}</div>" if SHOW_AVATAR else ""
+# Kaart 1: Kort advies (grid layout met avatar)
 st.markdown(f"""
-<div class="card" id="advice-card">
+<div class="card">
   <div class="card-title">Kort advies</div>
-  {avatar_html}
-  <div class="card-body">
-    {advies_md if rendered else ""}
+  <div class="advice-grid">
+    <div class="advice-copy">
+      {advies_md if rendered else ""}
+    </div>
+    <div class="avatar-box">
+      {AVATAR_SVG if SHOW_AVATAR else ""}
+    </div>
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -330,7 +343,6 @@ with st.form("manual"):
     go = st.form_submit_button("Vraag AI om advies")
 
 if go and link:
-    # open ballon + advies opnieuw
     item_name = _product_name(link)
     quick = get_quick_blurb(link, item_name)
     opener = random.choice(OPENERS)
@@ -343,8 +355,10 @@ if go and link:
     st.markdown(f"""
     <div class="card">
       <div class="card-title">Kort advies</div>
-      {avatar_html}
-      <div class="card-body">{advies2}</div>
+      <div class="advice-grid">
+        <div class="advice-copy">{advies2}</div>
+        <div class="avatar-box">{AVATAR_SVG if SHOW_AVATAR else ""}</div>
+      </div>
     </div>
     <div class="card">
       <div class="card-title">Alternatieven uit deze webshop</div>
