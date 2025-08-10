@@ -34,17 +34,14 @@ st.markdown("""
 html, body, [data-testid="stAppViewContainer"]{ height:100%; }
 html, body, [class*="stApp"]{ font-family:"Inter", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
 
-/* Paarse gradient background */
 [data-testid="stAppViewContainer"]{
   background: radial-gradient(1200px 600px at 50% -100px, #C8B9FF 0%, #AA98FF 30%, #8F7DFF 60%, #7A66F7 100%);
 }
 [data-testid="stHeader"] { display:none; }
 footer { visibility:hidden; }
 
-/* Layout breedte */
 .block-container{ max-width: 860px; padding-top: 8px !important; padding-bottom: 96px !important; }
 
-/* Tekstballon */
 .balloon{
   background: rgba(255,255,255,0.85);
   border: 1px solid rgba(255,255,255,0.75);
@@ -58,7 +55,6 @@ footer { visibility:hidden; }
   margin-top: 6px;
 }
 
-/* Cards */
 .card{
   background:#fff;
   border-radius: 22px;
@@ -73,7 +69,6 @@ footer { visibility:hidden; }
 }
 .card-body{ color:#2b2b46; }
 
-/* Advieskaart: tekst links, avatar rechts */
 .advice-grid{
   display:grid;
   grid-template-columns: 1fr 220px;
@@ -87,13 +82,11 @@ footer { visibility:hidden; }
   box-shadow: 0 10px 30px rgba(23,0,75,.15);
 }
 
-/* Responsive */
 @media (max-width: 720px){
   .advice-grid{ grid-template-columns: 1fr; }
   .avatar-box{ order:-1; margin-bottom: 8px; }
 }
 
-/* Pills */
 .pills{ display:flex; gap:10px; flex-wrap:wrap; }
 .pill{
   background:#F4F3FF; color:#2b2b46; border:1px solid #E5E4FF;
@@ -102,7 +95,6 @@ footer { visibility:hidden; }
 }
 .pill:hover{ transform: translateY(-1px); }
 
-/* Sticky CTA onderin */
 .cta{
   position: fixed; left:50%; transform:translateX(-50%);
   bottom: 18px; z-index: 1000;
@@ -114,10 +106,7 @@ footer { visibility:hidden; }
 }
 .cta .dot{ width:10px; height:10px; border-radius:50%; background:#6F5BFF; box-shadow:0 0 0 6px rgba(111,91,255,.15); }
 
-/* Inputs */
-.stTextInput > div > div > input, .stSelectbox > div > div {
-  border-radius:12px !important; min-height:42px;
-}
+.stTextInput > div > div > input, .stSelectbox > div > div { border-radius:12px !important; min-height:42px; }
 
 h1, h2, h3 { letter-spacing:-.02em; }
 .small-note{ color:#6B7280; font-size: 13px; }
@@ -154,7 +143,7 @@ if st.session_state.show_prefs:
 else:
     lichaamsvorm = "Weet ik niet"; huidskleur="Medium"; lengte="1.60 - 1.75m"; gelegenheid="Vrije tijd"; gevoel="Casual"
 
-# ---------- CTA onderin -> zet prefs=1 en reload ----------
+# ---------- CTA onderin ----------
 st.markdown("""
 <button class="cta" onclick="
   const u = new URL(window.location);
@@ -167,15 +156,11 @@ st.markdown("""
 
 # ---------- Helpers ----------
 def esc(x) -> str:
-    """HTML-escape voor veilige injectie in st.markdown(unsafe_allow_html=True)."""
     return html_escape("" if x is None else str(x))
 
 def as_list(v):
-    """Zorgt dat we altijd een lijst hebben (LLM kan soms een string teruggeven)."""
-    if v is None:
-        return []
-    if isinstance(v, list):
-        return v
+    if v is None: return []
+    if isinstance(v, list): return v
     return [v]
 
 def _keywords_from_url(u: str):
@@ -208,11 +193,7 @@ def _host(u: str) -> str:
     return f"{p.scheme}://{p.netloc}"
 
 def _shop_searches(u: str, query: str, limit=1):
-    """
-    Bouw shop-specifieke zoek-URL's op basis van gangbare patronen.
-    """
-    host = _host(u)
-    q = quote(query)
+    host = _host(u); q = quote(query)
     patterns = [
         f"/search?q={q}", f"/zoeken?query={q}", f"/s?searchTerm={q}",
         f"/search?text={q}", f"/catalogsearch/result/?q={q}",
@@ -223,16 +204,11 @@ def _shop_searches(u: str, query: str, limit=1):
         full = host + path
         if full not in seen:
             out.append(full); seen.add(full)
-        if len(out) >= limit:
-            break
+        if len(out) >= limit: break
     return out
 
 def _google_fallback(u: str, query: str):
-    """
-    Fallback naar Google Shopping/site search als de shop geen known pattern heeft.
-    """
-    p = urlparse(u)
-    host = p.netloc
+    p = urlparse(u); host = p.netloc
     q = quote(f"site:{host} {query}")
     return f"https://www.google.com/search?q={q}"
 
@@ -248,7 +224,6 @@ def build_shop_alternatives(u: str):
     if cats:
         items.append(("Categorie (zelfde shop)", cats[0]))
         if len(cats) > 1: items.append(("Bredere categorie", cats[1]))
-    # Voeg ook een gerichte zoekopdracht toe
     items.append((f"Zoek: {kw}", _build_link_or_fallback(u, kw)))
     seen, out = set(), []
     for t, url in items:
@@ -256,16 +231,8 @@ def build_shop_alternatives(u: str):
             out.append((t, url)); seen.add(url)
     return out[:3]
 
-# ---------- OpenAI: gestructureerd advies ----------
+# ---------- OpenAI ----------
 def get_advice_json(link: str) -> dict:
-    """
-    Vraagt de LLM om kort, NL B1 en gestructureerd advies met:
-    - summary (3 bullets)
-    - combine_with: lijst van {label, query} om te zoeken binnen dezelfde shop
-    - fit_color: bullets (kleurpalet, pasvorm, tip/avoid)
-    - care: 1 korte zin
-    - alternatives: lijst van {label, query}
-    """
     profile = f"figuur={lichaamsvorm}, huidskleur={huidskleur}, lengte={lengte}, gelegenheid={gelegenheid}, stijlgevoel={gevoel}"
     system = "Je bent een modieuze maar praktische personal stylist. Schrijf in helder Nederlands (B1). Kort en concreet."
     user = f"""
@@ -308,10 +275,8 @@ Regels:
             max_tokens=500,
         )
         raw = resp.choices[0].message.content
-        data = json.loads(raw)
-        return data
+        return json.loads(raw)
     except Exception:
-        # Fallback minimal advies
         return {
             "summary": ["Stijlvol item.", "Makkelijk te combineren.", "Tijdloos."],
             "combine_with": [
@@ -350,7 +315,7 @@ Use only simple, clear words (B1). No jargon. No emojis.
     )
     return resp.choices[0].message.content.strip().rstrip()
 
-# --- Mockup-achtige avatar (inline SVG) ---
+# --- Avatar SVG ---
 AVATAR_SVG = """
 <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" aria-label="AI Stylist Avatar" role="img">
   <defs>
@@ -362,7 +327,6 @@ AVATAR_SVG = """
   </defs>
   <g>
     <rect x="0" y="0" width="220" height="220" rx="36" fill="url(#bg)"/>
-    <!-- simpele zittende figuur -->
     <circle cx="120" cy="72" r="24" fill="#F6C8A7"/>
     <rect x="76" y="98" width="110" height="70" rx="32" fill="#6F79FF"/>
     <path d="M92 158 Q120 170 148 158" fill="#4C55D8"/>
@@ -373,13 +337,10 @@ AVATAR_SVG = """
 </svg>
 """
 
-# ---------- Render ----------
+# ---------- Rendering ----------
 def render_advice(link: str, data: dict):
-    # --- Samenvatting ---
     summary_items = [f"<li>{esc(x)}</li>" for x in as_list(data.get("summary"))]
     summary_html = f"<ul>{''.join(summary_items)}</ul>" if summary_items else ""
-
-    # --- Fit & Color ---
     fit_color = data.get("fit_color", {}) or {}
     color_ul = "".join([f"<li>{esc(x)}</li>" for x in as_list(fit_color.get("color_palette"))])
     tips_ul  = "".join([f"<li>{esc(x)}</li>" for x in as_list(fit_color.get("fit_tips"))])
@@ -400,14 +361,11 @@ def render_advice(link: str, data: dict):
             <p class="small-note" style="margin-top:8px;">{esc(data.get("care",""))}</p>
           </div>
         </div>
-        <div class="avatar-box">
-          {AVATAR_SVG if SHOW_AVATAR else ""}
-        </div>
+        <div class="avatar-box">{AVATAR_SVG if SHOW_AVATAR else ""}</div>
       </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # --- Combineer met ---
     combos = as_list(data.get("combine_with"))
     if combos:
         pills_html = ""
@@ -430,7 +388,6 @@ def render_advice(link: str, data: dict):
         </div>
         """, unsafe_allow_html=True)
 
-    # --- Alternatieven ---
     pills_html = ""
     alts = as_list(data.get("alternatives"))
     for a in alts:
@@ -442,7 +399,6 @@ def render_advice(link: str, data: dict):
         url = _build_link_or_fallback(link, query)
         pills_html += f"<a class='pill' href='{url}' target='_blank'>{label}</a>"
 
-    # extra shop-categorie/fallbacks
     for t, u in build_shop_alternatives(link):
         pills_html += f"<a class='pill' href='{u}' target='_blank'>{esc(t)}</a>"
 
@@ -459,4 +415,36 @@ def render_advice(link: str, data: dict):
 rendered = False
 advies = None
 balloon_html = ""
-OP
+
+OPENERS = [
+    "Goede keuze!", "Mooie pick!", "Stijlvolle keuze!", "Ziet er top uit!", "Sterke look!"
+]
+
+if link_qs and auto:
+    item_name = _product_name(link_qs)
+    quick = get_quick_blurb(link_qs, item_name)
+    opener = random.choice(OPENERS)
+    balloon_html = f"<div class='balloon'>{esc(opener)} {esc(quick)}</div>"
+    advies = get_advice_json(link_qs)
+    rendered = True
+
+if balloon_html:
+    st.markdown(balloon_html, unsafe_allow_html=True)
+
+if rendered and advies:
+    render_advice(link_qs, advies)
+
+with st.form("manual"):
+    link = st.text_input("🔗 Plak een productlink", value=link_qs or "", placeholder="https://…")
+    go = st.form_submit_button("Vraag AI om advies")
+
+if go and link:
+    try:
+        item_name = _product_name(link)
+        quick = get_quick_blurb(link, item_name)
+        opener = random.choice(OPENERS)
+        st.markdown(f"<div class='balloon'>{esc(opener)} {esc(quick)}</div>", unsafe_allow_html=True)
+        data = get_advice_json(link)
+        render_advice(link, data)
+    except Exception as e:
+        st.error(f"Er ging iets mis bij het ophalen van advies: {e}")
