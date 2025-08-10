@@ -2,6 +2,7 @@
 import os, re, random, json
 import streamlit as st
 from urllib.parse import urlparse, quote
+from html import escape as html_escape
 from openai import OpenAI
 
 # ========= Instellingen =========
@@ -165,6 +166,18 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------- Helpers ----------
+def esc(x) -> str:
+    """HTML-escape voor veilige injectie in st.markdown(unsafe_allow_html=True)."""
+    return html_escape("" if x is None else str(x))
+
+def as_list(v):
+    """Zorgt dat we altijd een lijst hebben (LLM kan soms een string teruggeven)."""
+    if v is None:
+        return []
+    if isinstance(v, list):
+        return v
+    return [v]
+
 def _keywords_from_url(u: str):
     try:
         slug = urlparse(u).path.rstrip("/").split("/")[-1]
@@ -297,7 +310,7 @@ Regels:
         raw = resp.choices[0].message.content
         data = json.loads(raw)
         return data
-    except Exception as e:
+    except Exception:
         # Fallback minimal advies
         return {
             "summary": ["Stijlvol item.", "Makkelijk te combineren.", "Tijdloos."],
@@ -337,25 +350,6 @@ Use only simple, clear words (B1). No jargon. No emojis.
     )
     return resp.choices[0].message.content.strip().rstrip()
 
-# ---------- UI logic ----------
-rendered = False
-advies = None
-balloon_html = ""
-OPENERS = ["Looks nice!", "Great pick!", "Nice choice!", "Love the vibe!", "Stylish pick!"]
-
-# Auto-run via querystring
-if link_qs and auto:
-    item_name = _product_name(link_qs)
-    quick = get_quick_blurb(link_qs, item_name)
-    opener = random.choice(OPENERS)
-    balloon_html = f"<div class='balloon'>{opener} {quick}</div>"
-    advies = get_advice_json(link_qs)
-    rendered = True
-
-# Tekstballon (alleen als er een link is)
-if balloon_html:
-    st.markdown(balloon_html, unsafe_allow_html=True)
-
 # --- Mockup-achtige avatar (inline SVG) ---
 AVATAR_SVG = """
 <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" aria-label="AI Stylist Avatar" role="img">
@@ -379,17 +373,17 @@ AVATAR_SVG = """
 </svg>
 """
 
+# ---------- Render ----------
 def render_advice(link: str, data: dict):
-    # --- Kaart 1: Samenvatting + Fit & Kleur (met avatar)
-    summary_html = ""
-    if data.get("summary"):
-        lis = "".join([f"<li>{st._escape_html(x)}</li>" for x in data["summary"]])
-        summary_html = f"<ul>{lis}</ul>"
+    # --- Samenvatting ---
+    summary_items = [f"<li>{esc(x)}</li>" for x in as_list(data.get("summary"))]
+    summary_html = f"<ul>{''.join(summary_items)}</ul>" if summary_items else ""
 
-    fit_color = data.get("fit_color", {})
-    color_ul = "".join([f"<li>{st._escape_html(x)}</li>" for x in fit_color.get("color_palette", [])])
-    tips_ul  = "".join([f"<li>{st._escape_html(x)}</li>" for x in fit_color.get("fit_tips", [])])
-    avoid_ul = "".join([f"<li>{st._escape_html(x)}</li>" for x in fit_color.get("avoid", [])])
+    # --- Fit & Color ---
+    fit_color = data.get("fit_color", {}) or {}
+    color_ul = "".join([f"<li>{esc(x)}</li>" for x in as_list(fit_color.get("color_palette"))])
+    tips_ul  = "".join([f"<li>{esc(x)}</li>" for x in as_list(fit_color.get("fit_tips"))])
+    avoid_ul = "".join([f"<li>{esc(x)}</li>" for x in as_list(fit_color.get("avoid"))])
 
     st.markdown(f"""
     <div class="card">
@@ -403,7 +397,7 @@ def render_advice(link: str, data: dict):
             {"<b>Kleuren</b><ul>"+color_ul+"</ul>" if color_ul else ""}
             {"<b>Tips</b><ul>"+tips_ul+"</ul>" if tips_ul else ""}
             {"<b>Vermijden</b><ul>"+avoid_ul+"</ul>" if avoid_ul else ""}
-            <p class="small-note" style="margin-top:8px;">{st._escape_html(data.get("care",""))}</p>
+            <p class="small-note" style="margin-top:8px;">{esc(data.get("care",""))}</p>
           </div>
         </div>
         <div class="avatar-box">
@@ -413,15 +407,19 @@ def render_advice(link: str, data: dict):
     </div>
     """, unsafe_allow_html=True)
 
-    # --- Kaart 2: Combineer met (met shop-zoeklinks)
-    combos = data.get("combine_with", [])
+    # --- Combineer met ---
+    combos = as_list(data.get("combine_with"))
     if combos:
         pills_html = ""
         for c in combos:
-            label = c.get("label","Shop")
-            query = c.get("query", label)
+            if not isinstance(c, dict):
+                label = esc(str(c)); query = str(c)
+            else:
+                label = esc(c.get("label","Shop"))
+                query = c.get("query", c.get("label","Shop"))
             url = _build_link_or_fallback(link, query)
-            pills_html += f"<a class='pill' href='{url}' target='_blank'>{st._escape_html(label)}</a>"
+            pills_html += f"<a class='pill' href='{url}' target='_blank'>{label}</a>"
+
         st.markdown(f"""
         <div class="card">
           <div class="card-title">Combineer met</div>
@@ -432,19 +430,21 @@ def render_advice(link: str, data: dict):
         </div>
         """, unsafe_allow_html=True)
 
-    # --- Kaart 3: Alternatieven (zelfde shop / zoek)
-    alts = data.get("alternatives", [])
+    # --- Alternatieven ---
     pills_html = ""
+    alts = as_list(data.get("alternatives"))
     for a in alts:
-        label = a.get("label","Alternatief")
-        query = a.get("query", label)
+        if not isinstance(a, dict):
+            label = esc(str(a)); query = str(a)
+        else:
+            label = esc(a.get("label","Alternatief"))
+            query = a.get("query", a.get("label","Alternatief"))
         url = _build_link_or_fallback(link, query)
-        pills_html += f"<a class='pill' href='{url}' target='_blank'>{st._escape_html(label)}</a>"
+        pills_html += f"<a class='pill' href='{url}' target='_blank'>{label}</a>"
 
-    # voeg ook je oude categorie/zoek fallback toe
-    shop_alts = build_shop_alternatives(link)
-    for t, u in shop_alts:
-        pills_html += f"<a class='pill' href='{u}' target='_blank'>{st._escape_html(t)}</a>"
+    # extra shop-categorie/fallbacks
+    for t, u in build_shop_alternatives(link):
+        pills_html += f"<a class='pill' href='{u}' target='_blank'>{esc(t)}</a>"
 
     st.markdown(f"""
     <div class="card">
@@ -455,24 +455,8 @@ def render_advice(link: str, data: dict):
     </div>
     """, unsafe_allow_html=True)
 
-# ---------- UI RENDER ----------
-# Auto-run render
-if rendered and advies:
-    render_advice(link_qs, advies)
-
-# Handmatige invoer
-with st.form("manual"):
-    link = st.text_input("🔗 Plak een productlink", value=link_qs or "", placeholder="https://…")
-    go = st.form_submit_button("Vraag AI om advies")
-
-if go and link:
-    try:
-        item_name = _product_name(link)
-        quick = get_quick_blurb(link, item_name)
-        opener = random.choice(["Looks nice!", "Great pick!", "Nice choice!", "Love the vibe!", "Stylish pick!"])
-        st.markdown(f"<div class='balloon'>{opener} {quick}</div>", unsafe_allow_html=True)
-
-        data = get_advice_json(link)
-        render_advice(link, data)
-    except Exception as e:
-        st.error(f"Er ging iets mis bij het ophalen van advies: {e}")
+# ---------- UI logic ----------
+rendered = False
+advies = None
+balloon_html = ""
+OP
