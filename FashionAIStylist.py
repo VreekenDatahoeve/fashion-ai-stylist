@@ -285,20 +285,21 @@ Use only simple, clear words (B1). No jargon. No emojis.
 def inject_avatar(selector=".card", lottie_src=LOTTIE_SRC):
     if not SHOW_AVATAR:
         return
-    st.components.v1.html(f"""
+    html_code = f"""
     <div></div>
     <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
     <script>
       // Plaats avatar in de eerste kaart op de pagina
       const card = window.parent.document.querySelector('{selector}');
-      if (card && !card.querySelector('.avatar')){
+      if (card && !card.querySelector('.avatar')) {{
         const wrap = document.createElement('div');
         wrap.className = 'avatar';
         wrap.innerHTML = `<lottie-player src="{lottie_src}" background="transparent" speed="1" loop autoplay style="width:100%;height:100%;"></lottie-player>`;
         card.appendChild(wrap);
-      }
+      }}
     </script>
-    """, height=0)
+    """
+    st.components.v1.html(html_code, height=0)
 
 # ---------- UI ----------
 korte_modus = True  # geen toggle; altijd kort en simpel
