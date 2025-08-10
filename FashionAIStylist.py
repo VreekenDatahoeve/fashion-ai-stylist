@@ -170,7 +170,6 @@ def _keywords_from_url(u: str):
         return "fashion"
 
 def _product_name(u: str):
-    """Maak nette titel uit slug, bv. 'basic sneakers' -> 'Basic Sneakers'."""
     kw = _keywords_from_url(u)
     return re.sub(r"\s+", " ", kw).strip().title()
 
@@ -214,16 +213,23 @@ def build_shop_alternatives(u: str):
             out.append((t, url)); seen.add(url)
     return out[:3]
 
-# ---------- OpenAI calls ----------
+# ---------- OpenAI calls (eenvoudige taal) ----------
 def get_advice_md(link: str, kort=True) -> str:
-    stijl = "Maak het superkort: max 70 woorden. Gebruik 3–5 bullets." if kort else "Houd het beknopt."
+    # Bullets kort en simpel in het Nederlands
+    stijl = (
+        "Maak het superkort. Schrijf in eenvoudig Nederlands (B1). "
+        "Gebruik 3–5 bullets. Max 8 woorden per bullet."
+        if kort else
+        "Gebruik eenvoudige woorden (B1) en korte zinnen."
+    )
     prompt = f"""
-Je bent een ervaren fashion stylist. Analyseer dit kledingstuk: {link}
+Je bent een vriendelijke fashion stylist. Analyseer dit kledingstuk: {link}
 Profiel: figuur={lichaamsvorm}, huidskleur={huidskleur}, lengte={lengte},
-gelegenheid={gelegenheid}, intentie={gevoel}.
+gelegenheid={gelegenheid}, stijlgevoel={gevoel}.
 {stijl}
 
-Schrijf ALLEEN:
+Schrijf ALLEEN dit, in het Nederlands:
+
 ## Korte beoordeling
 - ...
 
@@ -236,7 +242,7 @@ Schrijf ALLEEN:
     resp = client.chat.completions.create(
         model=MODEL,
         messages=[
-            {"role":"system","content":"Wees concreet, modern, vriendelijk en to-the-point."},
+            {"role":"system","content":"Wees concreet, modern en to-the-point. Vermijd moeilijke woorden en jargon."},
             {"role":"user","content":prompt},
         ],
         temperature=0.5, max_tokens=450,
@@ -244,19 +250,19 @@ Schrijf ALLEEN:
     return resp.choices[0].message.content
 
 def get_quick_blurb(link: str, item_name: str) -> str:
-    """1 zin, max 22 woorden, Engels, start met 'This <item_name>'."""
+    """1 zin, max 20 woorden, Engels, start met 'This <item_name>', simpele woorden."""
     prompt = f"""
 Item: {item_name}
 Link: {link}
 User profile -> figure:{lichaamsvorm}, skin:{huidskleur}, height:{lengte}, occasion:{gelegenheid}, vibe:{gevoel}.
-Write ONE short English sentence (max 22 words) starting with:
+Write ONE short English sentence (max 20 words) starting with:
 This {item_name}
-Continue with a concise benefit + how to wear/fit or color tip. No emojis.
+Use only simple, clear words (B1). No jargon. No emojis.
 """
     resp = client.chat.completions.create(
         model=MODEL,
         messages=[
-            {"role":"system","content":"Return exactly one sentence; crisp, helpful, fashion-savvy."},
+            {"role":"system","content":"Return exactly one friendly, simple sentence."},
             {"role":"user","content":prompt},
         ],
         temperature=0.6, max_tokens=60,
@@ -264,18 +270,17 @@ Continue with a concise benefit + how to wear/fit or color tip. No emojis.
     return resp.choices[0].message.content.strip().rstrip()
 
 # ---------- UI ----------
-korte_modus = st.checkbox("Korte feedback (aanbevolen)", value=True)
+# geen checkbox / geen success — direct naar content
+korte_modus = True
 
 # Advies/ballon voorbereiden
 rendered = False
 advies_md = ""
 balloon_html = ""
 
-# De opener voor de ballon roteren per run
 OPENERS = ["Looks nice!", "Great pick!", "Nice choice!", "Love the vibe!", "Stylish pick!"]
 
 if link_qs and auto:
-    st.success("🔗 Link ontvangen via bookmarklet")
     item_name = _product_name(link_qs)
     quick = get_quick_blurb(link_qs, item_name)
     opener = random.choice(OPENERS)
@@ -283,7 +288,7 @@ if link_qs and auto:
     advies_md = get_advice_md(link_qs, kort=korte_modus)
     rendered = True
 
-# Tekstballon (alleen tonen als er context is)
+# Tekstballon (alleen als er een link is)
 if balloon_html:
     st.markdown(balloon_html, unsafe_allow_html=True)
 
