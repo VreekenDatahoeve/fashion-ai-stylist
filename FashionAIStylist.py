@@ -7,6 +7,8 @@ from openai import OpenAI
 # ========= Instellingen =========
 APP_URL = "https://fashion-ai-stylis-ifidobqmkgjtn7gjxgrudb.streamlit.app"  # <-- JOUW URL (geen trailing slash)
 MODEL   = "gpt-4o-mini"
+SHOW_AVATAR = True
+LOTTIE_SRC  = "https://assets6.lottiefiles.com/packages/lf20_qp1q7mct.json"  # vervang gerust door je eigen
 # =================================
 
 # --- API key ---
@@ -44,7 +46,7 @@ footer { visibility:hidden; }
 /* Layout breedte */
 .block-container{ max-width: 860px; padding-top: 8px !important; padding-bottom: 96px !important; }
 
-/* --- Tekstballon (licht transparant) --- */
+/* Tekstballon */
 .balloon{
   background: rgba(255,255,255,0.82);
   border: 1px solid rgba(255,255,255,0.75);
@@ -66,13 +68,14 @@ footer { visibility:hidden; }
   box-shadow: 0 16px 40px rgba(23,0,75,0.18);
   border: 1px solid #F1ECFF;
   margin-top: 18px;
+  position: relative; /* nodig voor avatar absolute positioning */
 }
 .card-title{
   font-size: 24px; font-weight: 800; color:#2d2a6c; margin:0 0 8px;
   display:flex; gap:10px; align-items:center;
 }
 
-/* Bullets (voor AI-output) */
+/* Bullets */
 .section-label{ color:#2d2a6c; font-weight:800; margin-top:10px; margin-bottom:4px; }
 ul.clean{ list-style:none; padding-left:0; margin:0; }
 ul.clean li{ position:relative; padding-left:26px; margin:8px 0; color:#2b2b46; font-size:16px; }
@@ -87,7 +90,7 @@ ul.clean li::before{ content:"•"; position:absolute; left:6px; top:-1px; color
 }
 .pill:hover{ transform: translateY(-1px); }
 
-/* Sticky CTA onderin, gecentreerd */
+/* Sticky CTA onderin */
 .cta{
   position: fixed; left:50%; transform:translateX(-50%);
   bottom: 18px; z-index: 1000;
@@ -107,6 +110,15 @@ ul.clean li::before{ content:"•"; position:absolute; left:6px; top:-1px; color
 /* Verberg helperknop voor CTA toggle */
 button[id="_pf_toggle"]{ display:none !important; }
 
+/* Avatar in kaart */
+.card .avatar {
+  position:absolute; right:14px; top:-8px;
+  width:160px; height:160px; pointer-events:none;
+}
+@media (max-width: 640px){
+  .card .avatar{ width:120px; height:120px; top:-10px; right:6px; }
+}
+
 /* Typografie */
 h1, h2, h3 { letter-spacing:-.02em; }
 </style>
@@ -124,6 +136,11 @@ auto    = str(_get("auto","0")) == "1"
 # ---------- Floating CTA -> opent sidebar ----------
 if "show_prefs" not in st.session_state:
     st.session_state.show_prefs = False
+
+# helperknop blijft verborgen via CSS
+st.button("_", key="_pf_toggle",
+          on_click=lambda: st.session_state.update(show_prefs=not st.session_state.show_prefs),
+          type="secondary")
 
 st.markdown("""
 <button class="cta" onClick="window.parent.postMessage({fab:1},'*')">
@@ -211,7 +228,6 @@ def build_shop_alternatives(u: str):
 
 # ---------- OpenAI calls (eenvoudige taal) ----------
 def get_advice_md(link: str, kort=True) -> str:
-    # Bullets kort en simpel in het Nederlands
     stijl = (
         "Maak het superkort. Schrijf in eenvoudig Nederlands (B1). "
         "Gebruik 3–5 bullets. Max 8 woorden per bullet."
@@ -265,11 +281,29 @@ Use only simple, clear words (B1). No jargon. No emojis.
     )
     return resp.choices[0].message.content.strip().rstrip()
 
-# ---------- UI ----------
-# geen checkbox / geen success — direct naar content
-korte_modus = True
+# ---------- Helper: avatar injectie in de laatste kaart ----------
+def inject_avatar(selector=".card", lottie_src=LOTTIE_SRC):
+    if not SHOW_AVATAR:
+        return
+    st.components.v1.html(f"""
+    <div></div>
+    <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+    <script>
+      // Plaats avatar in de eerste kaart op de pagina
+      const card = window.parent.document.querySelector('{selector}');
+      if (card && !card.querySelector('.avatar')){
+        const wrap = document.createElement('div');
+        wrap.className = 'avatar';
+        wrap.innerHTML = `<lottie-player src="{lottie_src}" background="transparent" speed="1" loop autoplay style="width:100%;height:100%;"></lottie-player>`;
+        card.appendChild(wrap);
+      }
+    </script>
+    """, height=0)
 
-# Advies/ballon voorbereiden
+# ---------- UI ----------
+korte_modus = True  # geen toggle; altijd kort en simpel
+
+# Voorbereiden ballon/advies
 rendered = False
 advies_md = ""
 balloon_html = ""
@@ -297,6 +331,9 @@ st.markdown(f"""
   </div>
 </div>
 """, unsafe_allow_html=True)
+
+# Avatar in de advieskaart injecteren
+inject_avatar(".card")
 
 # Kaart 2: Alternatieven
 alts = build_shop_alternatives(link_qs) if rendered else []
@@ -330,6 +367,11 @@ if go and link:
       <div class="card-title">Kort advies</div>
       <div class="card-body">{advies2}</div>
     </div>
+    """, unsafe_allow_html=True)
+
+    inject_avatar(".card:last-of-type")  # avatar in deze nieuwe advieskaart
+
+    st.markdown(f"""
     <div class="card">
       <div class="card-title">Alternatieven uit deze webshop</div>
       <div class="card-body">
