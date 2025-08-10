@@ -102,15 +102,6 @@ h1, h2, h3 { letter-spacing:-.02em; }
 </style>
 """, unsafe_allow_html=True)
 
-# ---------- Bookmarklet hint in banner ----------
-bm = f"javascript:(()=>{{location.href='{APP_URL}?u='+encodeURIComponent(location.href)+'&auto=1';}})();"
-st.markdown(f"""
-<div class="banner">
-  Bookmarklet: sleep deze <a href="{bm}">AI-stylist</a> naar je bladwijzerbalk en klik op een productpagina.
-</div>
-""", unsafe_allow_html=True)
-st.caption("Tip: bladwijzerbalk aanzetten met Ctrl+Shift+B (Mac: Cmd+Shift+B).")
-
 # ---------- Query params ----------
 qp = st.query_params
 def _get(name, default=""):
@@ -240,7 +231,7 @@ korte_modus = st.checkbox("Korte feedback (aanbevolen)", value=True)
 
 # Kaart 1: Kort advies
 st.markdown('<div class="card">', unsafe_allow_html=True)
-st.markdown('<div class="card-title"><span class="emoji">👗</span>Kort advies</div>', unsafe_allow_html=True)
+st.markdown('<div class="card-title">Kort advies</div>', unsafe_allow_html=True)
 
 rendered = False
 if link_qs and auto:
