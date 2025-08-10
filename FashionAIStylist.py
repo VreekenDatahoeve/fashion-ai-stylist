@@ -125,10 +125,6 @@ auto    = str(_get("auto","0")) == "1"
 if "show_prefs" not in st.session_state:
     st.session_state.show_prefs = False
 
-st.button("_", key="_pf_toggle",
-          on_click=lambda: st.session_state.update(show_prefs=not st.session_state.show_prefs),
-          type="secondary")
-
 st.markdown("""
 <button class="cta" onClick="window.parent.postMessage({fab:1},'*')">
   <span class="dot"></span> Vertel iets over jezelf
