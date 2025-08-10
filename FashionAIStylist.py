@@ -17,52 +17,99 @@ if not API_KEY:
 client = OpenAI(api_key=API_KEY)
 
 # --- Pagina ---
-st.set_page_config(page_title="Fashion AI Stylist", page_icon="👗", layout="centered")
+st.set_page_config(page_title="Fashion AI Stylist", page_icon="👗", layout="centered", initial_sidebar_state="collapsed")
 
-# --- UI / CSS (speels, modern) ---
+# ---------- CSS: mockup-stijl ----------
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-html, body, [class*="stApp"]{
-  font-family:"Inter", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-}
-.block-container{max-width:920px;padding-top:1rem;padding-bottom:3rem;}
-h1{letter-spacing:-.02em}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
 
+html, body, [data-testid="stAppViewContainer"]{ height:100%; }
+html, body, [class*="stApp"]{ font-family:"Inter", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+
+/* Paarse gradient background */
+[data-testid="stAppViewContainer"]{
+  background: radial-gradient(1200px 600px at 50% -100px, #C8B9FF 0%, #AA98FF 30%, #8F7DFF 60%, #7A66F7 100%);
+}
+[data-testid="stHeader"] { display:none; }
+footer { visibility:hidden; }
+
+/* Layout breedte */
+.block-container{ max-width: 860px; padding-top: 8px !important; padding-bottom: 96px !important; }
+
+/* BANNER bovenaan */
+.banner{
+  background: rgba(255,255,255,0.9);
+  color:#2d2a6c;
+  padding: 14px 18px;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(40,12,120,0.15);
+  backdrop-filter: blur(3px);
+  border:1px solid rgba(255,255,255,0.7);
+  font-weight: 600;
+}
+
+/* Cards */
 .card{
-  background:#fff; border:1px solid #EAEAF0; border-radius:18px;
-  padding:18px 18px; box-shadow:0 8px 28px rgba(17,24,39,.06); margin:.5rem 0 1rem 0;
+  background:#fff;
+  border-radius: 22px;
+  padding: 22px;
+  box-shadow: 0 16px 40px rgba(23,0,75,0.18);
+  border: 1px solid #F1ECFF;
+  margin-top: 18px;
 }
-.pill{
-  display:inline-block; padding:8px 12px; border-radius:999px; background:#fff;
-  border:1px solid #E5E7EB; margin:6px 8px 0 0; box-shadow:0 2px 8px rgba(0,0,0,.05);
-  text-decoration:none; color:#111827; font-size:.95rem;
+.card-title{
+  font-size: 24px; font-weight: 800; color:#2d2a6c; margin:0 0 8px;
+  display:flex; gap:10px; align-items:center;
 }
-.pill:hover{ border-color:#7C3AED }
-.fab{
-  position:fixed; right:22px; bottom:22px;
-  background:linear-gradient(90deg,#7C3AED,#6D28D9); color:#fff; border:0; border-radius:999px;
-  padding:.75rem 1rem; font-weight:700; box-shadow:0 10px 24px rgba(124,58,237,.35);
-  cursor:pointer; z-index:9999;
+.card-title .emoji{
+  font-size: 22px; width:36px; height:36px; display:grid; place-items:center;
+  background:#EEF0FF; color:#5d59f6; border-radius:10px; flex:0 0 36px;
 }
-.fab:hover{ transform:translateY(-1px) }
-.note{ color:#6B7280; font-size:.925rem }
 
-/* inputs wat ronder */
+/* Bullets */
+.section-label{ color:#2d2a6c; font-weight:800; margin-top:10px; margin-bottom:4px; }
+ul.clean{ list-style:none; padding-left:0; margin:0; }
+ul.clean li{ position:relative; padding-left:26px; margin:8px 0; color:#2b2b46; font-size:16px; }
+ul.clean li::before{ content:"•"; position:absolute; left:6px; top:-1px; color:#5d59f6; font-size:24px; line-height:1; }
+
+/* Alternatieven - pills */
+.pills{ display:flex; gap:10px; flex-wrap:wrap; }
+.pill{
+  background:#F4F3FF; color:#2b2b46; border:1px solid #E5E4FF;
+  padding:10px 14px; border-radius: 999px; font-weight:700; text-decoration:none;
+  box-shadow: 0 6px 14px rgba(23,0,75,0.10);
+}
+.pill:hover{ transform: translateY(-1px); }
+
+/* Sticky CTA onderin, gecentreerd */
+.cta{
+  position: fixed; left:50%; transform:translateX(-50%);
+  bottom: 18px; z-index: 1000;
+  background:#ffffff; color:#2d2a6c;
+  border:1px solid #ECE9FF; border-radius: 24px;
+  padding: 12px 16px; font-weight:800;
+  box-shadow: 0 18px 40px rgba(23,0,75,0.25);
+  display:flex; align-items:center; gap:10px;
+}
+.cta .dot{ width:10px; height:10px; border-radius:50%; background:#6F5BFF; box-shadow:0 0 0 6px rgba(111,91,255,.15); }
+
+/* Inputs */
 .stTextInput > div > div > input, .stSelectbox > div > div { border-radius:12px !important; min-height:42px; }
+
+/* Verberg standaard titelruimte */
+h1, h2, h3 { letter-spacing:-.02em; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- Bookmarklet hint (optioneel zichtbaar) ---
+# ---------- Bookmarklet hint in banner ----------
 bm = f"javascript:(()=>{{location.href='{APP_URL}?u='+encodeURIComponent(location.href)+'&auto=1';}})();"
-st.markdown(
-    f'**Bookmarklet:** sleep deze <a href="{bm}">AI-stylist</a> naar je bladwijzerbalk en klik op een productpagina.',
-    unsafe_allow_html=True
-)
+st.markdown(f"""
+<div class="banner">
+  Bookmarklet: sleep deze <a href="{bm}">AI-stylist</a> naar je bladwijzerbalk en klik op een productpagina.
+</div>
+""", unsafe_allow_html=True)
 st.caption("Tip: bladwijzerbalk aanzetten met Ctrl+Shift+B (Mac: Cmd+Shift+B).")
-
-st.markdown("# 👗 AI Stylingadvies op basis van kledinglink")
-st.write("Supersnel: **kort advies** en **alternatieven**. Optionele voorkeuren vind je bij _‘Vertel iets over jezelf’_.")
 
 # ---------- Query params ----------
 qp = st.query_params
@@ -73,14 +120,16 @@ def _get(name, default=""):
 link_qs = _get("u").strip()
 auto    = str(_get("auto","0")) == "1"
 
-# ---------- Floating FAB -> opent sidebar ----------
+# ---------- Floating CTA -> opent sidebar ----------
 if "show_prefs" not in st.session_state:
     st.session_state.show_prefs = False
 
-# knop die via JS wordt geklikt (onzichtbaar)
 st.button("_", key="_pf_toggle", help="", on_click=lambda: st.session_state.update(show_prefs=not st.session_state.show_prefs), type="secondary")
-# eigenlijke FAB
-st.markdown("<button class='fab' onClick=\"window.parent.postMessage({fab:1},'*')\">💬 Vertel iets over jezelf</button>", unsafe_allow_html=True)
+st.markdown("""
+<button class="cta" onClick="window.parent.postMessage({fab:1},'*')">
+  <span class="dot"></span> Vertel iets over jezelf
+</button>
+""", unsafe_allow_html=True)
 st.components.v1.html("""
 <script>
 window.addEventListener('message',(e)=>{
@@ -92,7 +141,7 @@ window.addEventListener('message',(e)=>{
 </script>
 """, height=0)
 
-# Sidebar met voorkeuren (opt.)
+# ---------- Sidebar voorkeuren ----------
 if st.session_state.show_prefs:
     with st.sidebar:
         st.markdown("### 👤 Vertel iets over jezelf")
@@ -103,10 +152,9 @@ if st.session_state.show_prefs:
         gevoel       = st.selectbox("Gevoel",       ["Zelfverzekerd","Speels","Elegant","Casual","Trendy"], index=3, key="pf_ge")
         st.button("Sluiten", use_container_width=True, on_click=lambda: st.session_state.update(show_prefs=False))
 else:
-    # defaults als sidebar dicht is
     lichaamsvorm = "Weet ik niet"; huidskleur="Medium"; lengte="1.60 - 1.75m"; gelegenheid="Vrije tijd"; gevoel="Casual"
 
-# ---------- Alternatieven-helper (zelfde shop) ----------
+# ---------- Alternatieven-helpers ----------
 def _keywords_from_url(u: str):
     try:
         slug = urlparse(u).path.rstrip("/").split("/")[-1]
@@ -148,16 +196,15 @@ def build_shop_alternatives(u: str):
     if cats:
         items.append(("Categorie (zelfde shop)", cats[0]))
         if len(cats) > 1: items.append(("Bredere categorie", cats[1]))
-    for s in searches:
+    for s in searches[:1]:
         items.append((f"Zoek: {kw}", s))
-    # uniek + max 3
     seen, out = set(), []
     for t, url in items:
         if url not in seen:
             out.append((t, url)); seen.add(url)
     return out[:3]
 
-# ---------- Advies-call ----------
+# ---------- OpenAI call ----------
 def get_advice_md(link: str, kort=True) -> str:
     stijl = "Maak het superkort: max 70 woorden. Gebruik 3–5 bullets." if kort else "Houd het beknopt."
     prompt = f"""
@@ -186,49 +233,50 @@ Schrijf ALLEEN:
     )
     return resp.choices[0].message.content
 
-# ---------- Toggle korte modus ----------
+# ---------- UI ----------
+
+# Korte modus (klein schakelaartje – niet in de kaart)
 korte_modus = st.checkbox("Korte feedback (aanbevolen)", value=True)
 
-# ---------- Blok 1: Advies ----------
-st.markdown("<div class='card'>", unsafe_allow_html=True)
-st.markdown("### ✨ Kort advies")
+# Kaart 1: Kort advies
+st.markdown('<div class="card">', unsafe_allow_html=True)
+st.markdown('<div class="card-title"><span class="emoji">👗</span>Kort advies</div>', unsafe_allow_html=True)
 
-# Auto-run (via bookmarklet/extensie) of handmatig
 rendered = False
 if link_qs and auto:
     st.success("🔗 Link ontvangen via bookmarklet")
     advies_md = get_advice_md(link_qs, kort=korte_modus)
+    # toon advies in drie secties zoals mockup
     st.markdown(advies_md)
     rendered = True
-st.markdown("</div>", unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
 
-# ---------- Blok 2: Alternatieven ----------
-st.markdown("### 🔁 Alternatieven uit deze webshop")
-if rendered:
-    alts = build_shop_alternatives(link_qs)
+# Kaart 2: Alternatieven
+st.markdown('<div class="card">', unsafe_allow_html=True)
+st.markdown('<div class="card-title"><span class="emoji">🔁</span>Alternatieven uit deze webshop</div>', unsafe_allow_html=True)
+
+alts = build_shop_alternatives(link_qs) if rendered else []
+if not alts:
+    st.markdown('<span style="color:#6B7280;">Er verschijnen alternatieven zodra je een productlink gebruikt.</span>', unsafe_allow_html=True)
 else:
-    alts = []
+    st.markdown('<div class="pills">' + "".join([f"<a class='pill' href='{u}' target='_blank'>{t}</a>" for t, u in alts]) + "</div>", unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
 
-if not alts and not rendered:
-    st.markdown("<span class='note'>Er verschijnen alternatieven zodra je een productlink gebruikt.</span>", unsafe_allow_html=True)
-else:
-    pills_html = "".join([f"<a class='pill' href='{u}' target='_blank'>🔗 {t}</a>" for t, u in alts])
-    st.markdown(pills_html, unsafe_allow_html=True)
-
-# ---------- Fallback: handmatige invoer ----------
+# Handmatige invoer (onder de kaarten)
 with st.form("manual"):
     link = st.text_input("🔗 Of plak hier een link", value=link_qs or "", placeholder="https://…")
     go = st.form_submit_button("Vraag AI om advies")
-
 if go and link:
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.markdown("### ✨ Kort advies")
-    advies_md = get_advice_md(link, kort=korte_modus)
-    st.markdown(advies_md)
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="card-title"><span class="emoji">👗</span>Kort advies</div>', unsafe_allow_html=True)
+    st.markdown(get_advice_md(link, kort=korte_modus))
+    st.markdown('</div>', unsafe_allow_html=True)
 
     a2 = build_shop_alternatives(link)
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="card-title"><span class="emoji">🔁</span>Alternatieven uit deze webshop</div>', unsafe_allow_html=True)
     if a2:
-        pills_html = "".join([f"<a class='pill' href='{u}' target='_blank'>🔗 {t}</a>" for t, u in a2])
-        st.markdown("### 🔁 Alternatieven uit deze webshop")
-        st.markdown(pills_html, unsafe_allow_html=True)
+        st.markdown('<div class="pills">' + "".join([f"<a class='pill' href='{u}' target='_blank'>{t}</a>" for t, u in a2]) + "</div>", unsafe_allow_html=True)
+    else:
+        st.markdown('<span style="color:#6B7280;">Geen alternatieven gevonden.</span>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
