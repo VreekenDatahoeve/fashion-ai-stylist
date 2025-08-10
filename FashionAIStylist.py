@@ -1,5 +1,5 @@
 # app.py
-import os, re
+import os, re, random
 import streamlit as st
 from urllib.parse import urlparse, quote
 from openai import OpenAI
@@ -24,7 +24,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ---------- CSS: mockup-stijl (zonder banner/emoji) ----------
+# ---------- CSS ----------
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
@@ -43,6 +43,20 @@ footer { visibility:hidden; }
 
 /* Layout breedte */
 .block-container{ max-width: 860px; padding-top: 8px !important; padding-bottom: 96px !important; }
+
+/* --- Tekstballon (licht transparant) --- */
+.balloon{
+  background: rgba(255,255,255,0.82);
+  border: 1px solid rgba(255,255,255,0.75);
+  border-radius: 18px;
+  padding: 14px 18px;
+  box-shadow: 0 12px 32px rgba(40,12,120,0.18);
+  backdrop-filter: blur(4px);
+  color:#2d2a6c;
+  font-weight: 700;
+  line-height:1.35;
+  margin-top: 6px;
+}
 
 /* Cards */
 .card{
@@ -145,15 +159,20 @@ if st.session_state.show_prefs:
 else:
     lichaamsvorm = "Weet ik niet"; huidskleur="Medium"; lengte="1.60 - 1.75m"; gelegenheid="Vrije tijd"; gevoel="Casual"
 
-# ---------- Alternatieven-helpers ----------
+# ---------- Helpers ----------
 def _keywords_from_url(u: str):
     try:
         slug = urlparse(u).path.rstrip("/").split("/")[-1]
         slug = re.sub(r"\d+", " ", slug)
         words = [w for w in re.split(r"[-_]+", slug) if w and len(w) > 1]
-        return " ".join(words[:3]) or "mode"
+        return " ".join(words[:4]) or "fashion"
     except Exception:
-        return "mode"
+        return "fashion"
+
+def _product_name(u: str):
+    """Maak nette titel uit slug, bv. 'basic sneakers' -> 'Basic Sneakers'."""
+    kw = _keywords_from_url(u)
+    return re.sub(r"\s+", " ", kw).strip().title()
 
 def _category_candidates(u: str):
     p = urlparse(u)
@@ -195,7 +214,7 @@ def build_shop_alternatives(u: str):
             out.append((t, url)); seen.add(url)
     return out[:3]
 
-# ---------- OpenAI call ----------
+# ---------- OpenAI calls ----------
 def get_advice_md(link: str, kort=True) -> str:
     stijl = "Maak het superkort: max 70 woorden. Gebruik 3–5 bullets." if kort else "Houd het beknopt."
     prompt = f"""
@@ -224,20 +243,51 @@ Schrijf ALLEEN:
     )
     return resp.choices[0].message.content
 
-# ---------- UI ----------
+def get_quick_blurb(link: str, item_name: str) -> str:
+    """1 zin, max 22 woorden, Engels, start met 'This <item_name>'."""
+    prompt = f"""
+Item: {item_name}
+Link: {link}
+User profile -> figure:{lichaamsvorm}, skin:{huidskleur}, height:{lengte}, occasion:{gelegenheid}, vibe:{gevoel}.
+Write ONE short English sentence (max 22 words) starting with:
+This {item_name}
+Continue with a concise benefit + how to wear/fit or color tip. No emojis.
+"""
+    resp = client.chat.completions.create(
+        model=MODEL,
+        messages=[
+            {"role":"system","content":"Return exactly one sentence; crisp, helpful, fashion-savvy."},
+            {"role":"user","content":prompt},
+        ],
+        temperature=0.6, max_tokens=60,
+    )
+    return resp.choices[0].message.content.strip().rstrip()
 
-# Schakelaar voor korte modus
+# ---------- UI ----------
 korte_modus = st.checkbox("Korte feedback (aanbevolen)", value=True)
 
-# Advies vooraf ophalen als bookmarklet actief is
+# Advies/ballon voorbereiden
 rendered = False
 advies_md = ""
+balloon_html = ""
+
+# De opener voor de ballon roteren per run
+OPENERS = ["Looks nice!", "Great pick!", "Nice choice!", "Love the vibe!", "Stylish pick!"]
+
 if link_qs and auto:
     st.success("🔗 Link ontvangen via bookmarklet")
+    item_name = _product_name(link_qs)
+    quick = get_quick_blurb(link_qs, item_name)
+    opener = random.choice(OPENERS)
+    balloon_html = f"<div class='balloon'>{opener} {quick}</div>"
     advies_md = get_advice_md(link_qs, kort=korte_modus)
     rendered = True
 
-# Kaart 1: Kort advies (één blok)
+# Tekstballon (alleen tonen als er context is)
+if balloon_html:
+    st.markdown(balloon_html, unsafe_allow_html=True)
+
+# Kaart 1: Kort advies
 st.markdown(f"""
 <div class="card">
   <div class="card-title">Kort advies</div>
@@ -247,7 +297,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Kaart 2: Alternatieven (één blok)
+# Kaart 2: Alternatieven
 alts = build_shop_alternatives(link_qs) if rendered else []
 pills_html = "".join([f"<a class='pill' href='{u}' target='_blank'>{t}</a>" for t, u in alts])
 st.markdown(f"""
@@ -259,12 +309,17 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Handmatige invoer (onder de kaarten)
+# Handmatige invoer
 with st.form("manual"):
     link = st.text_input("🔗 Of plak hier een link", value=link_qs or "", placeholder="https://…")
     go = st.form_submit_button("Vraag AI om advies")
 
 if go and link:
+    item_name = _product_name(link)
+    quick = get_quick_blurb(link, item_name)
+    opener = random.choice(OPENERS)
+    st.markdown(f"<div class='balloon'>{opener} {quick}</div>", unsafe_allow_html=True)
+
     advies2 = get_advice_md(link, kort=korte_modus)
     a2 = build_shop_alternatives(link)
     pills2 = "".join([f"<a class='pill' href='{u}' target='_blank'>{t}</a>" for t, u in a2])
