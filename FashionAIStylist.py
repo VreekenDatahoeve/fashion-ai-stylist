@@ -34,14 +34,17 @@ st.markdown("""
 html, body, [data-testid="stAppViewContainer"]{ height:100%; }
 html, body, [class*="stApp"]{ font-family:"Inter", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
 
+/* Paarse gradient background */
 [data-testid="stAppViewContainer"]{
   background: radial-gradient(1200px 600px at 50% -100px, #C8B9FF 0%, #AA98FF 30%, #8F7DFF 60%, #7A66F7 100%);
 }
 [data-testid="stHeader"] { display:none; }
 footer { visibility:hidden; }
 
+/* Layout breedte */
 .block-container{ max-width: 860px; padding-top: 8px !important; padding-bottom: 96px !important; }
 
+/* Tekstballon */
 .balloon{
   background: rgba(255,255,255,0.85);
   border: 1px solid rgba(255,255,255,0.75);
@@ -55,6 +58,7 @@ footer { visibility:hidden; }
   margin-top: 6px;
 }
 
+/* Cards */
 .card{
   background:#fff;
   border-radius: 22px;
@@ -69,24 +73,29 @@ footer { visibility:hidden; }
 }
 .card-body{ color:#2b2b46; }
 
+/* Advieskaart: tekst links, avatar rechts */
 .advice-grid{
   display:grid;
-  grid-template-columns: 1fr 220px;
+  grid-template-columns: 1fr 220px; /* avatar breedte */
   gap: 12px;
   align-items: start;
 }
 .advice-copy{ min-width:0; }
 .avatar-box{ display:flex; justify-content:center; position:relative; z-index:0; }
-.avatar-box svg{
+.avatar-box svg,
+.avatar-box img{
   width:100%; height:auto; border-radius:24px;
   box-shadow: 0 10px 30px rgba(23,0,75,.15);
+  object-fit:contain;
 }
 
+/* Responsive */
 @media (max-width: 720px){
   .advice-grid{ grid-template-columns: 1fr; }
   .avatar-box{ order:-1; margin-bottom: 8px; }
 }
 
+/* Pills */
 .pills{ display:flex; gap:10px; flex-wrap:wrap; }
 .pill{
   background:#F4F3FF; color:#2b2b46; border:1px solid #E5E4FF;
@@ -95,6 +104,7 @@ footer { visibility:hidden; }
 }
 .pill:hover{ transform: translateY(-1px); }
 
+/* Sticky CTA onderin */
 .cta{
   position: fixed; left:50%; transform:translateX(-50%);
   bottom: 18px; z-index: 1000;
@@ -106,7 +116,10 @@ footer { visibility:hidden; }
 }
 .cta .dot{ width:10px; height:10px; border-radius:50%; background:#6F5BFF; box-shadow:0 0 0 6px rgba(111,91,255,.15); }
 
-.stTextInput > div > div > input, .stSelectbox > div > div { border-radius:12px !important; min-height:42px; }
+/* Inputs */
+.stTextInput > div > div > input, .stSelectbox > div > div {
+  border-radius:12px !important; min-height:42px;
+}
 
 h1, h2, h3 { letter-spacing:-.02em; }
 .small-note{ color:#6B7280; font-size: 13px; }
@@ -123,6 +136,38 @@ def _get(name, default=""):
 link_qs = _get("u").strip()
 auto    = str(_get("auto","0")) == "1"
 prefs_q = _get("prefs","0") == "1"
+
+# ---------- Avatar instellingen ----------
+AVATAR_URL = _get("avatar","") or os.getenv("AVATAR_URL") or st.secrets.get("AVATAR_URL","")
+
+# Fallback SVG (als er geen eigen avatar is)
+AVATAR_SVG = """
+<svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" aria-label="AI Stylist Avatar" role="img">
+  <defs>
+    <radialGradient id="bg" cx="60%" cy="30%" r="80%">
+      <stop offset="0%" stop-color="#c9d4ff"/>
+      <stop offset="60%" stop-color="#9fb0ff"/>
+      <stop offset="100%" stop-color="#7a86ff"/>
+    </radialGradient>
+  </defs>
+  <g>
+    <rect x="0" y="0" width="220" height="220" rx="36" fill="url(#bg)"/>
+    <circle cx="120" cy="72" r="24" fill="#F6C8A7"/>
+    <rect x="76" y="98" width="110" height="70" rx="32" fill="#6F79FF"/>
+    <path d="M92 158 Q120 170 148 158" fill="#4C55D8"/>
+    <circle cx="112" cy="70" r="4" fill="#5a3b2e"/>
+    <circle cx="130" cy="70" r="4" fill="#5a3b2e"/>
+    <path d="M112 82 Q121 88 130 82" stroke="#5a3b2e" stroke-width="3" fill="none" stroke-linecap="round"/>
+  </g>
+</svg>
+"""
+
+def render_avatar_html():
+    if not SHOW_AVATAR:
+        return ""
+    if AVATAR_URL:
+        return f"<img src='{html_escape(AVATAR_URL)}' alt='AI Stylist' loading='lazy' />"
+    return AVATAR_SVG
 
 # ---------- Sidebar voorkeuren ----------
 if "show_prefs" not in st.session_state:
@@ -143,7 +188,7 @@ if st.session_state.show_prefs:
 else:
     lichaamsvorm = "Weet ik niet"; huidskleur="Medium"; lengte="1.60 - 1.75m"; gelegenheid="Vrije tijd"; gevoel="Casual"
 
-# ---------- CTA onderin ----------
+# ---------- CTA onderin -> zet prefs=1 en reload ----------
 st.markdown("""
 <button class="cta" onclick="
   const u = new URL(window.location);
@@ -156,9 +201,11 @@ st.markdown("""
 
 # ---------- Helpers ----------
 def esc(x) -> str:
+    """HTML-escape voor veilige injectie in st.markdown(unsafe_allow_html=True)."""
     return html_escape("" if x is None else str(x))
 
 def as_list(v):
+    """Zorgt dat we altijd een lijst hebben (LLM kan soms een string teruggeven)."""
     if v is None: return []
     if isinstance(v, list): return v
     return [v]
@@ -193,6 +240,7 @@ def _host(u: str) -> str:
     return f"{p.scheme}://{p.netloc}"
 
 def _shop_searches(u: str, query: str, limit=1):
+    """Bouw shop-specifieke zoek-URL's op basis van gangbare patronen."""
     host = _host(u); q = quote(query)
     patterns = [
         f"/search?q={q}", f"/zoeken?query={q}", f"/s?searchTerm={q}",
@@ -208,6 +256,7 @@ def _shop_searches(u: str, query: str, limit=1):
     return out
 
 def _google_fallback(u: str, query: str):
+    """Fallback naar Google Shopping/site search als de shop geen known pattern heeft."""
     p = urlparse(u); host = p.netloc
     q = quote(f"site:{host} {query}")
     return f"https://www.google.com/search?q={q}"
@@ -231,8 +280,16 @@ def build_shop_alternatives(u: str):
             out.append((t, url)); seen.add(url)
     return out[:3]
 
-# ---------- OpenAI ----------
+# ---------- OpenAI: gestructureerd advies ----------
 def get_advice_json(link: str) -> dict:
+    """
+    Vraagt de LLM om kort, NL B1 en gestructureerd advies met:
+    - summary (3 bullets)
+    - combine_with: lijst van {label, query} om te zoeken binnen dezelfde shop
+    - fit_color: bullets (kleurpalet, pasvorm, tip/avoid)
+    - care: 1 korte zin
+    - alternatives: lijst van {label, query}
+    """
     profile = f"figuur={lichaamsvorm}, huidskleur={huidskleur}, lengte={lengte}, gelegenheid={gelegenheid}, stijlgevoel={gevoel}"
     system = "Je bent een modieuze maar praktische personal stylist. Schrijf in helder Nederlands (B1). Kort en concreet."
     user = f"""
@@ -277,6 +334,7 @@ Regels:
         raw = resp.choices[0].message.content
         return json.loads(raw)
     except Exception:
+        # Fallback minimal advies
         return {
             "summary": ["Stijlvol item.", "Makkelijk te combineren.", "Tijdloos."],
             "combine_with": [
@@ -315,32 +373,12 @@ Use only simple, clear words (B1). No jargon. No emojis.
     )
     return resp.choices[0].message.content.strip().rstrip()
 
-# --- Avatar SVG ---
-AVATAR_SVG = """
-<svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" aria-label="AI Stylist Avatar" role="img">
-  <defs>
-    <radialGradient id="bg" cx="60%" cy="30%" r="80%">
-      <stop offset="0%" stop-color="#c9d4ff"/>
-      <stop offset="60%" stop-color="#9fb0ff"/>
-      <stop offset="100%" stop-color="#7a86ff"/>
-    </radialGradient>
-  </defs>
-  <g>
-    <rect x="0" y="0" width="220" height="220" rx="36" fill="url(#bg)"/>
-    <circle cx="120" cy="72" r="24" fill="#F6C8A7"/>
-    <rect x="76" y="98" width="110" height="70" rx="32" fill="#6F79FF"/>
-    <path d="M92 158 Q120 170 148 158" fill="#4C55D8"/>
-    <circle cx="112" cy="70" r="4" fill="#5a3b2e"/>
-    <circle cx="130" cy="70" r="4" fill="#5a3b2e"/>
-    <path d="M112 82 Q121 88 130 82" stroke="#5a3b2e" stroke-width="3" fill="none" stroke-linecap="round"/>
-  </g>
-</svg>
-"""
-
-# ---------- Rendering ----------
+# ---------- Render ----------
 def render_advice(link: str, data: dict):
+    # --- Kaart 1: Samenvatting + Fit & Kleur (met avatar)
     summary_items = [f"<li>{esc(x)}</li>" for x in as_list(data.get("summary"))]
     summary_html = f"<ul>{''.join(summary_items)}</ul>" if summary_items else ""
+
     fit_color = data.get("fit_color", {}) or {}
     color_ul = "".join([f"<li>{esc(x)}</li>" for x in as_list(fit_color.get("color_palette"))])
     tips_ul  = "".join([f"<li>{esc(x)}</li>" for x in as_list(fit_color.get("fit_tips"))])
@@ -361,11 +399,14 @@ def render_advice(link: str, data: dict):
             <p class="small-note" style="margin-top:8px;">{esc(data.get("care",""))}</p>
           </div>
         </div>
-        <div class="avatar-box">{AVATAR_SVG if SHOW_AVATAR else ""}</div>
+        <div class="avatar-box">
+          {render_avatar_html()}
+        </div>
       </div>
     </div>
     """, unsafe_allow_html=True)
 
+    # --- Kaart 2: Combineer met (met shop-zoeklinks)
     combos = as_list(data.get("combine_with"))
     if combos:
         pills_html = ""
@@ -377,7 +418,6 @@ def render_advice(link: str, data: dict):
                 query = c.get("query", c.get("label","Shop"))
             url = _build_link_or_fallback(link, query)
             pills_html += f"<a class='pill' href='{url}' target='_blank'>{label}</a>"
-
         st.markdown(f"""
         <div class="card">
           <div class="card-title">Combineer met</div>
@@ -388,6 +428,7 @@ def render_advice(link: str, data: dict):
         </div>
         """, unsafe_allow_html=True)
 
+    # --- Kaart 3: Alternatieven (zelfde shop / zoek)
     pills_html = ""
     alts = as_list(data.get("alternatives"))
     for a in alts:
@@ -415,11 +456,9 @@ def render_advice(link: str, data: dict):
 rendered = False
 advies = None
 balloon_html = ""
+OPENERS = ["Goede keuze!", "Mooie pick!", "Stijlvolle keuze!", "Ziet er top uit!", "Sterke look!"]
 
-OPENERS = [
-    "Goede keuze!", "Mooie pick!", "Stijlvolle keuze!", "Ziet er top uit!", "Sterke look!"
-]
-
+# Auto-run via querystring
 if link_qs and auto:
     item_name = _product_name(link_qs)
     quick = get_quick_blurb(link_qs, item_name)
@@ -428,12 +467,15 @@ if link_qs and auto:
     advies = get_advice_json(link_qs)
     rendered = True
 
+# Tekstballon (alleen als er een link is)
 if balloon_html:
     st.markdown(balloon_html, unsafe_allow_html=True)
 
+# Auto render
 if rendered and advies:
     render_advice(link_qs, advies)
 
+# Handmatige invoer
 with st.form("manual"):
     link = st.text_input("🔗 Plak een productlink", value=link_qs or "", placeholder="https://…")
     go = st.form_submit_button("Vraag AI om advies")
