@@ -1,5 +1,5 @@
 # app.py
-import os, re, random, json, io, base64
+import os, re, random, json
 import streamlit as st
 from urllib.parse import urlparse, quote
 from html import escape as html_escape
@@ -8,7 +8,6 @@ from openai import OpenAI
 # ========= Instellingen =========
 APP_URL = "https://fashion-ai-stylis-ifidobqmkgjtn7gjxgrudb.streamlit.app"  # <-- JOUW URL (geen trailing slash)
 MODEL   = "gpt-4o-mini"
-SHOW_AVATAR = True   # zet False om te verbergen
 # =================================
 
 # --- API key ---
@@ -44,13 +43,13 @@ footer { visibility:hidden; }
 /* Layout breedte */
 .block-container{ max-width: 860px; padding-top: 8px !important; padding-bottom: 96px !important; }
 
-/* Info-chip bovenaan */
+/* Chips / ballonnen */
 .note-chip{
   display:block;
   margin: 6px 0 14px;
   padding: 10px 14px;
   border-radius: 14px;
-  background: rgba(255,255,255,0.6);
+  background: rgba(255,255,255,0.60);
   border: 1px solid rgba(255,255,255,0.75);
   color:#2d2a6c;
   font-weight:600;
@@ -58,11 +57,24 @@ footer { visibility:hidden; }
   backdrop-filter: blur(4px);
 }
 
+.balloon{
+  display:block;
+  margin: 0 0 14px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.42); /* iets transparanter */
+  border: 1px solid rgba(255,255,255,0.7);
+  color:#2d2a6c;
+  font-weight:800;
+  box-shadow: 0 12px 28px rgba(40,12,120,0.16);
+  backdrop-filter: blur(4px);
+}
+
 /* Cards */
 .card{
   background:#ffffff;
   border-radius: 22px;
-  padding: 18px 18px 18px 18px;
+  padding: 18px;
   box-shadow: 0 16px 40px rgba(23,0,75,0.18);
   border: 1px solid #EFEBFF;
   margin-top: 12px;
@@ -71,30 +83,14 @@ footer { visibility:hidden; }
   font-size: 22px; font-weight: 800; color:#2d2a6c; margin:0 0 10px;
   display:flex; gap:10px; align-items:center;
 }
-.card-title .icon{ width:22px; height:22px; display:inline-block; }
+.card-body{ color:#2b2b46; }
 
-/* Advieskaart: tekst links, avatar rechts */
-.advice-grid{
-  display:grid;
-  grid-template-columns: 1fr 220px; /* avatar breedte */
-  gap: 12px;
-  align-items: start;
-}
-.advice-copy{ min-width:0; color:#2b2b46; }
-.avatar-box{ display:flex; justify-content:center; position:relative; z-index:0; }
-.avatar-box img{
-  width:100%; height:auto; border-radius:24px;
-  box-shadow: 0 10px 30px rgba(23,0,75,.15);
-  object-fit:contain; background:transparent;
-}
-
-/* Lijsten: compact en met en-dash vibe */
+/* Lijsten */
 ul{ margin: 0 0 0 1.15rem; padding:0; }
 li{ margin: 4px 0; }
-.section-title{ font-weight:800; margin:10px 0 2px; color:#2d2a6c; }
 
 /* Pills */
-.pills{ display:flex; gap:10px; flex-wrap:wrap; margin-top: 8px; }
+.pills{ display:flex; gap:10px; flex-wrap:wrap; margin-top: 10px; }
 .pill{
   background:#F6F5FF; color:#2b2b46; border:1px solid #E7E5FF;
   padding:10px 14px; border-radius: 999px; font-weight:700; text-decoration:none;
@@ -114,18 +110,10 @@ li{ margin: 4px 0; }
 }
 .cta .dot{ width:10px; height:10px; border-radius:50%; background:#6F5BFF; box-shadow:0 0 0 6px rgba(111,91,255,.15); }
 
-/* Inputs */
-.stTextInput > div > div > input, .stSelectbox > div > div {
-  border-radius:12px !important; min-height:42px;
-}
+.stTextInput > div > div > input, .stSelectbox > div > div { border-radius:12px !important; min-height:42px; }
 
 h1, h2, h3 { letter-spacing:-.02em; }
 .small-note{ color:#6B7280; font-size: 13px; }
-
-@media (max-width: 720px){
-  .advice-grid{ grid-template-columns: 1fr; }
-  .avatar-box{ order:-1; margin-bottom: 6px; }
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -158,7 +146,7 @@ if st.session_state.show_prefs:
 else:
     lichaamsvorm = "Weet ik niet"; huidskleur="Medium"; lengte="1.60 - 1.75m"; gelegenheid="Vrije tijd"; gevoel="Casual"
 
-# ---------- CTA onderin -> zet prefs=1 en reload ----------
+# ---------- CTA onderin ----------
 st.markdown("""
 <button class="cta" onclick="
   const u = new URL(window.location);
@@ -169,15 +157,9 @@ st.markdown("""
 </button>
 """, unsafe_allow_html=True)
 
-# ---------- Icons (inline SVG) ----------
-DRESS_SVG = """<svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M8 3l1.5 3-2 3 2 11h5l2-11-2-3L16 3h-2l-1 2-1-2H8z" fill="#556BFF"/>
-</svg>"""
-
-REFRESH_SVG = """<svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M21 12a9 9 0 10-2.64 6.36" stroke="#7B61FF" stroke-width="2" stroke-linecap="round"/>
-<path d="M21 12v6h-6" stroke="#7B61FF" stroke-width="2" stroke-linecap="round"/>
-</svg>"""
+# ---------- Icons ----------
+INFO_SVG = """<svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" stroke="#556BFF" stroke-width="2"/><path d="M12 8h.01M11 11h2v5h-2z" stroke="#556BFF" stroke-width="2" stroke-linecap="round"/></svg>"""
+HANGER_SVG = """<svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 7a3 3 0 116 0c0 1.5-1 2-2 2v2" stroke="#7B61FF" stroke-width="2" stroke-linecap="round"/><path d="M3 17h18l-9-5-9 5z" stroke="#7B61FF" stroke-width="2" stroke-linecap="round"/></svg>"""
 
 # ---------- Helpers ----------
 def esc(x) -> str:
@@ -200,18 +182,6 @@ def _keywords_from_url(u: str):
 def _product_name(u: str):
     kw = _keywords_from_url(u)
     return re.sub(r"\s+", " ", kw).strip().title()
-
-def _category_candidates(u: str):
-    p = urlparse(u)
-    segs = [s for s in p.path.split("/") if s]
-    cands = []
-    if len(segs) >= 2: cands.append("/" + "/".join(segs[:-1]) + "/")
-    if len(segs) >= 3: cands.append("/" + "/".join(segs[:-2]) + "/")
-    seen, out = set(), []
-    for c in cands:
-        if c not in seen:
-            out.append(c); seen.add(c)
-    return [f"{p.scheme}://{p.netloc}{c}" for c in out]
 
 def _host(u: str) -> str:
     p = urlparse(u)
@@ -241,33 +211,15 @@ def _build_link_or_fallback(u: str, query: str):
     found = _shop_searches(u, query, limit=1)
     return found[0] if found else _google_fallback(u, query)
 
-def build_shop_alternatives(u: str):
-    if not u: return []
-    kw = _keywords_from_url(u)
-    cats = _category_candidates(u)
-    items = []
-    if cats:
-        items.append(("Categorie (zelfde shop)", cats[0]))
-        if len(cats) > 1: items.append(("Bredere categorie", cats[1]))
-    items.append((f"Zoek: {kw}", _build_link_or_fallback(u, kw)))
-    seen, out = set(), []
-    for t, url in items:
-        if url not in seen:
-            out.append((t, url)); seen.add(url)
-    return out[:3]
-
-# ---------- Avatar (base64) ----------
-# Dit is een nauwkeurige crop van de illustratie in jouw voorbeeld (zittende vrouw).
-AVATAR_DATA_URL = "data:image/png;base64,{}"
-AVATAR_B64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAA1oAAAFSKAAAAAA..."  # <-- wordt zo dadelijk overschreven in runtime
-)
-
-# Om de boodschap compact te houden, vullen we AVATAR_B64 pas runtime met een korte, gecomprimeerde variant.
-# (De app werkt ook als AVATAR_B64 al gevuld is.)
-
 # ---------- OpenAI: gestructureerd advies ----------
 def get_advice_json(link: str) -> dict:
+    """
+    Verwacht JSON:
+    {
+      "general": {"intro":"max 2 korte zinnen","bullets":["exact 3 bullets"]},
+      "wear": {"blurb":"1 korte zin","combine_with":[{"label":"...","query":"..."}]}
+    }
+    """
     profile = f"figuur={lichaamsvorm}, huidskleur={huidskleur}, lengte={lengte}, gelegenheid={gelegenheid}, stijlgevoel={gevoel}"
     system = "Je bent een modieuze maar praktische personal stylist. Schrijf in helder Nederlands (B1). Kort en concreet."
     user = f"""
@@ -276,27 +228,25 @@ Profiel: {profile}
 
 Geef ALLEEN JSON met exact dit schema:
 {{
-  "summary": ["max 3 korte bullets"],
-  "combine_with": [
-    {{"label":"rechte jeans","query":"straight jeans"}},
-    {{"label":"oversized blazer of hoodie","query":"oversized blazer"}}
-  ],
-  "fit_color": {{
-    "color_palette": ["max 3 kleuren die goed passen"],
-    "fit_tips": ["max 3 tips voor pasvorm en lengte"],
-    "avoid": ["max 2 dingen om te vermijden"]
+  "general": {{
+    "intro": "max 2 korte zinnen met eerste observatie (pasvorm, materiaal, vibe).",
+    "bullets": ["3 kernpunten: kwaliteit/details", "waarom het werkt", "wanneer te dragen"]
   }},
-  "care": "1 korte zin over verzorging",
-  "alternatives": [
-    {{"label":"Categorie (zelfde shop)","query":"categorie"}},
-    {{"label":"Bredere categorie","query":"bestsellers"}}
-  ]
+  "wear": {{
+    "blurb": "1 korte zin met draagadvies (hoe te stylen voor de gelegenheid).",
+    "combine_with": [
+      {{"label":"rechte jeans","query":"straight jeans"}},
+      {{"label":"oversized blazer","query":"oversized blazer"}},
+      {{"label":"basic sneakers","query":"witte leren sneakers"}}
+    ]
+  }}
 }}
 
 Regels:
 - Geen uitleg buiten JSON.
-- Combineer-suggesties moeten generiek genoeg zijn om te zoeken op dezelfde webshop (gebruik zoekwoorden, geen merk).
-- Korte, duidelijke tekst. Geen emoji.
+- Gebruik B1 Nederlands, korte zinnen.
+- Max 2 zinnen in "general.intro". Precies 3 bullets in "general.bullets".
+- "combine_with" items moeten generiek genoeg zijn om binnen dezelfde webshop te zoeken.
 """
     try:
         resp = client.chat.completions.create(
@@ -309,101 +259,62 @@ Regels:
             temperature=0.5,
             max_tokens=500,
         )
-        raw = resp.choices[0].message.content
-        return json.loads(raw)
+        return json.loads(resp.choices[0].message.content)
     except Exception:
+        # Fallback
         return {
-            "summary": ["Zwarte, chunky sneakers; stijlvol en veelzijdig."],
-            "combine_with": [
-                {"label":"Rechte jeans of cargobroek","query":"straight jeans"},
-                {"label":"Oversized blazer of hoodie","query":"oversized hoodie"}
-            ],
-            "fit_color": {
-                "color_palette": ["neutrale tinten","denim","grijs"],
-                "fit_tips": ["Strakke broek voor contrast","Hou top relaxed-fit"],
-                "avoid": ["Te veel felle kleuren"]
+            "general": {
+                "intro": "Stijlvol item met moderne look. Valt comfortabel en is makkelijk te combineren.",
+                "bullets": ["Tijdloos ontwerp", "Neutrale kleur werkt overal bij", "Fijn voor werk en weekend"]
             },
-            "care": "Reinig met zachte borstel; laat aan de lucht drogen.",
-            "alternatives": [
-                {"label":"Categorie (zelfde shop)","query":"sneakers"},
-                {"label":"Bredere categorie","query":"casual shoes"}
-            ]
+            "wear": {
+                "blurb": "Houd de rest simpel en laat het item spreken.",
+                "combine_with": [
+                    {"label":"Rechte jeans","query":"straight jeans"},
+                    {"label":"Oversized blazer","query":"oversized blazer"},
+                    {"label":"Basic sneakers","query":"witte leren sneakers"}
+                ]
+            }
         }
 
-def get_quick_blurb(link: str, item_name: str) -> str:
-    prompt = f"""
-Item: {item_name}
-Link: {link}
-User profile -> figure:{lichaamsvorm}, skin:{huidskleur}, height:{lengte}, occasion:{gelegenheid}, vibe:{gevoel}.
-Write ONE short English sentence (max 20 words) starting with:
-This {item_name}
-Use only simple, clear words (B1). No jargon. No emojis.
-"""
-    resp = client.chat.completions.create(
-        model=MODEL,
-        messages=[
-            {"role":"system","content":"Return exactly one friendly, simple sentence."},
-            {"role":"user","content":prompt},
-        ],
-        temperature=0.6, max_tokens=60,
-    )
-    return resp.choices[0].message.content.strip().rstrip()
-
-# ---------- Avatar helper ----------
-def get_avatar_html():
-    if not SHOW_AVATAR:
-        return ""
-    # Gebruik de ingesloten base64
-    return f"<img src='{AVATAR_DATA_URL.format(AVATAR_B64)}' alt='AI Stylist' loading='lazy' />"
-
 # ---------- Render ----------
-def render_advice(link: str, data: dict):
-    # Titel en icon
+def render_general(data: dict):
+    g = data.get("general", {}) or {}
+    intro = esc(g.get("intro","")).strip()
+    bullets = [esc(x) for x in as_list(g.get("bullets"))][:3]
+
     st.markdown(f"""
     <div class="card">
-      <div class="card-title">{DRESS_SVG} Kort advies</div>
-      <div class="advice-grid">
-        <div class="advice-copy">
-          <ul>
-            {''.join([f"<li>{esc(x)}</li>" for x in as_list(data.get('summary'))])}
-          </ul>
-
-          <div class="section-title">• Combineer met</div>
-          <ul>
-            {''.join([f"<li>{esc(item.get('label', item))}</li>" for item in as_list(data.get('combine_with'))])}
-          </ul>
-
-          <div class="section-title">• Kleur & pasvorm</div>
-          <ul>
-            {''.join([f"<li>{esc(x)}</li>" for x in as_list(data.get('fit_color',{}).get('color_palette'))])}
-            {''.join([f"<li>{esc(x)}</li>" for x in as_list(data.get('fit_color',{}).get('fit_tips'))])}
-          </ul>
-          <p class="small-note">{esc(data.get('care',''))}</p>
-        </div>
-        <div class="avatar-box">{get_avatar_html()}</div>
+      <div class="card-title">{INFO_SVG} Algemeen</div>
+      <div class="card-body">
+        <p style="margin:0 0 8px; line-height:1.45;">{intro}</p>
+        <ul>
+          {''.join([f"<li>{b}</li>" for b in bullets])}
+        </ul>
       </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Alternatieven
+def render_wear(link: str, data: dict):
+    w = data.get("wear", {}) or {}
+    blurb = esc(w.get("blurb",""))
+    combos = as_list(w.get("combine_with"))
+
     pills_html = ""
-    # eigen alternatieven
-    for a in as_list(data.get("alternatives")):
-        if isinstance(a, dict):
-            label = esc(a.get("label","Alternatief"))
-            query = a.get("query", label)
+    for c in combos:
+        if isinstance(c, dict):
+            label = esc(c.get("label","Shop"))
+            query = c.get("query", c.get("label","Shop"))
         else:
-            label = esc(str(a)); query = str(a)
+            label = esc(str(c)); query = str(c)
         url = _build_link_or_fallback(link, query)
         pills_html += f"<a class='pill' href='{url}' target='_blank'>{label}</a>"
-    # shop fallback
-    for t, u in build_shop_alternatives(link):
-        pills_html += f"<a class='pill' href='{u}' target='_blank'>{esc(t)}</a>"
 
     st.markdown(f"""
     <div class="card">
-      <div class="card-title">{REFRESH_SVG} Alternatieven uit deze webshop</div>
+      <div class="card-title">{HANGER_SVG} Draagadvies</div>
       <div class="card-body">
+        <p style="margin:0 0 8px; line-height:1.45;">{blurb}</p>
         <div class="pills">{pills_html}</div>
       </div>
     </div>
@@ -414,35 +325,34 @@ def render_advice(link: str, data: dict):
 st.markdown("<span class='note-chip'>Bookmarklet: sleep deze AI-stylist naar je bladwijzerbalk en klik op een productpagina.</span>", unsafe_allow_html=True)
 
 rendered = False
-advies = None
-balloon_html = ""
-OPENERS = ["Goede keuze!", "Mooie pick!", "Stijlvolle keuze!", "Ziet er top uit!", "Sterke look!"]
+advice = None
 
+# Productnaam-ballon (alleen als er een link is)
+def product_balloon(u: str):
+    if not u: return
+    name = _product_name(u)
+    st.markdown(f"<div class='balloon'>{esc(name)}</div>", unsafe_allow_html=True)
+
+# Auto-run
 if link_qs and auto:
-    item_name = _product_name(link_qs)
-    quick = get_quick_blurb(link_qs, item_name)
-    opener = random.choice(OPENERS)
-    balloon_html = f"<div class='note-chip' style='font-weight:800'>{esc(opener)} {esc(quick)}</div>"
-    advies = get_advice_json(link_qs)
+    product_balloon(link_qs)
+    advice = get_advice_json(link_qs)
     rendered = True
 
-if balloon_html:
-    st.markdown(balloon_html, unsafe_allow_html=True)
-
-if rendered and advies:
-    render_advice(link_qs, advies)
-
+# Handmatige invoer
 with st.form("manual"):
     link = st.text_input("🔗 Plak een productlink", value=link_qs or "", placeholder="https://…")
     go = st.form_submit_button("Vraag AI om advies")
 
 if go and link:
+    product_balloon(link)
     try:
-        item_name = _product_name(link)
-        quick = get_quick_blurb(link, item_name)
-        opener = random.choice(OPENERS)
-        st.markdown(f"<div class='note-chip' style='font-weight:800'>{esc(opener)} {esc(quick)}</div>", unsafe_allow_html=True)
-        data = get_advice_json(link)
-        render_advice(link, data)
+        advice = get_advice_json(link)
+        rendered = True
     except Exception as e:
         st.error(f"Er ging iets mis bij het ophalen van advies: {e}")
+
+# Render secties
+if rendered and advice:
+    render_general(advice)
+    render_wear(link_qs if auto else link, advice)
