@@ -244,12 +244,6 @@ def get_advice_json(link: str) -> dict:
         "Gebruik het profiel expliciet: noem lengte/pasvorm/kleuren/gelegenheid waar relevant. "
         "Wees eerlijk over onzekerheid: speculeer niet over details die je niet weet. "
         "Geen merknamen of emoji."
-    ), kort en concreet. "
-        "Gebruik het profiel expliciet: noem lengte/pasvorm/kleuren/gelegenheid waar relevant. "
-        "Wees eerlijk over onzekerheid: speculeer niet over merk-specifieke details. Geen merknamen of emoji."
-    ), kort en concreet. "
-        "Wees eerlijk over onzekerheid: speculeer niet over details die je niet weet. "
-        "Gebruik geen merknamen of emoji."
     )
 
     user_msg = f"""
