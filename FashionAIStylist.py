@@ -333,49 +333,44 @@ def render_single_card(data: dict, link: str):
     WARN_SVG  = """<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'><path d='M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z'/></svg>"""
     LINK_SVG2 = """<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'><path d='M3.9 12a5 5 0 015-5h3v2h-3a3 3 0 100 6h3v2h-3a5 5 0 01-5-5zm7-3h3a5 5 0 110 10h-3v-2h3a3 3 0 100-6h-3V9z'/></svg>"""
 
-    html = dedent(f"""
-    <div class="card">
-      <div class="card-title">
-        <svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3l1.5 3-2 3 2 11h5l2-11-2-3L16 3h-2l-1 2-1-2H8z" fill="#556BFF"/></svg>
-        {headline}
-        <span class="badge {vclass}">{CHECK_SVG if vclass=='doen' else WARN_SVG if vclass=='twijfel' else WARN_SVG} {verdict}</span>
-      </div>
-      <div class="card-body">
-        <ul>
-          {''.join([f"<li>{x}</li>" for x in intro_lines])}
-        </ul>
-
-        <div class="section-h">• Maat & pasvorm</div>
-        <ul>
-          <li><strong>Maat:</strong> {size_tip}</li>
-          {''.join([f"<li>{x}</li>" for x in fit_tips])}
-        </ul>
-
-        <div class="section-h">• Kleur & combineren</div>
-        <ul>
-          {''.join([f"<li>{x}</li>" for x in colors])}
-          {''.join([f"<li>{x}</li>" for x in combine])}
-        </ul>
-
-        <div class="section-h">• Kwaliteit & onderhoud</div>
-        <ul>
-          {''.join([f"<li>{x}</li>" for x in care])}
-        </ul>
-
-        <div class="section-h">• Snel checken op de productpagina</div>
-        <ul>
-          {''.join([f"<li>{x}</li>" for x in checks])}
-        </ul>
-
-        <div class="btnrow">
-          <a class="btn" href="{cheaper_url}" target="_blank" rel="nofollow noopener">{LINK_SVG2} Bekijk goedkoper alternatief</a>
-          <a class="btn" href="{premium_url}" target="_blank" rel="nofollow noopener">{LINK_SVG2} Bekijk premium alternatief</a>
-        </div>
-
-        <div class="small-note" style="margin-top:10px;">Advies op basis van productnaam/keywords en jouw profiel. Controleer altijd samenstelling en maattabel op de productpagina.</div>
-      </div>
-    </div>
-    """)
+    # BELANGRIJK: geen voorloopspaties (anders maakt Markdown er een codeblok van)
+    html = f"""
+<div class="card">
+<div class="card-title">
+<svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3l1.5 3-2 3 2 11h5l2-11-2-3L16 3h-2l-1 2-1-2H8z" fill="#556BFF"/></svg>
+{headline}
+<span class="badge {vclass}">{CHECK_SVG if vclass=='doen' else WARN_SVG if vclass=='twijfel' else WARN_SVG} {verdict}</span>
+</div>
+<div class="card-body">
+<ul>
+{''.join([f"<li>{x}</li>" for x in intro_lines])}
+</ul>
+<div class="section-h">• Maat & pasvorm</div>
+<ul>
+<li><strong>Maat:</strong> {size_tip}</li>
+{''.join([f"<li>{x}</li>" for x in fit_tips])}
+</ul>
+<div class="section-h">• Kleur & combineren</div>
+<ul>
+{''.join([f"<li>{x}</li>" for x in colors])}
+{''.join([f"<li>{x}</li>" for x in combine])}
+</ul>
+<div class="section-h">• Kwaliteit & onderhoud</div>
+<ul>
+{''.join([f"<li>{x}</li>" for x in care])}
+</ul>
+<div class="section-h">• Snel checken op de productpagina</div>
+<ul>
+{''.join([f"<li>{x}</li>" for x in checks])}
+</ul>
+<div class="btnrow">
+<a class="btn" href="{cheaper_url}" target="_blank" rel="nofollow noopener">{LINK_SVG2} Bekijk goedkoper alternatief</a>
+<a class="btn" href="{premium_url}" target="_blank" rel="nofollow noopener">{LINK_SVG2} Bekijk premium alternatief</a>
+</div>
+<div class="small-note" style="margin-top:10px;">Advies op basis van productnaam/keywords en jouw profiel. Controleer altijd samenstelling en maattabel op de productpagina.</div>
+</div>
+</div>
+"""
     st.markdown(html, unsafe_allow_html=True)
 
 # ---------- UI ----------
