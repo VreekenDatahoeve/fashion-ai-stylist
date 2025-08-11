@@ -241,6 +241,9 @@ def get_advice_json(link: str) -> dict:
 
     system_msg = (
         "Je bent een modieuze maar praktische personal stylist. Schrijf in helder Nederlands (B1), kort en concreet. "
+        "Gebruik het profiel expliciet: noem lengte/pasvorm/kleuren/gelegenheid waar relevant. "
+        "Wees eerlijk over onzekerheid: speculeer niet over merk-specifieke details. Geen merknamen of emoji."
+    ), kort en concreet. "
         "Wees eerlijk over onzekerheid: speculeer niet over details die je niet weet. "
         "Gebruik geen merknamen of emoji."
     )
@@ -256,14 +259,13 @@ Profiel: {profile}
 Geef ALLEEN JSON met exact deze velden (geen extra velden):
 {json.dumps(SCHEMA_HINT, ensure_ascii=False)}
 
-Regels:
+Belangrijk:
+- Maak het advies persoonlijk: verbind elk punt aan het profiel (lengte/fit/huidskleur/gelegenheid/vibe/maten).
 - Houd het bondig, B1, maximaal 8–10 woorden per bullet.
-- Stem maat-/pasvormadvies af op profiel, maar blijf neutraal als het itemtype onduidelijk is.
-- Combineer-advies: generieke items (jeans, witte sneaker, trench, etc.).
-- Colors: stem af op huidskleur (koel/warme/neutrale tinten) en gelegenheid.
-- Care/quality: gebruik algemene, veilige richtlijnen per categorie (bijv. T-shirt 180–220 g/m², knit: pilling-risico beperken). Geen verzonnen cijfers of claims.
-- Checks: 2 concrete dingen om op de productpagina te controleren (bijv. samenstelling %, lengte in cm, waslabel, voering).
-- "verdict" is één woord: Doen, Twijfel of Overslaan.
+- Combineer-advies: generieke items, afgestemd op gelegenheid en vibe.
+- Colors: stem af op huidskleur; noem twee veilige keuzes.
+- Care/quality: algemene, veilige richtlijnen per categorie (geen verzonnen cijfers of claims).
+- Checks: 2 concrete dingen om op de productpagina te controleren.
 """
 
     try:
@@ -374,6 +376,10 @@ def render_single_card(data: dict, link: str):
     st.markdown(html, unsafe_allow_html=True)
 
 # ---------- UI ----------
+# (optioneel) bookmarklet-tekst zoals in de mock
+st.markdown(dedent("""
+<span class='note-chip'>Bookmarklet: sleep deze AI-stylist naar je bladwijzerbalk en klik op een productpagina.</span>
+"""), unsafe_allow_html=True)
 
 # State voor handmatige link
 if "last_link" not in st.session_state:
