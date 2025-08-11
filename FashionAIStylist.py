@@ -3,6 +3,7 @@ import os, re, json
 import streamlit as st
 from urllib.parse import urlparse, quote
 from html import escape as html_escape
+from textwrap import dedent
 from openai import OpenAI
 
 # ========= Instellingen =========
@@ -26,7 +27,7 @@ st.set_page_config(
 )
 
 # ---------- CSS ----------
-st.markdown("""
+st.markdown(dedent("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
 
@@ -47,7 +48,7 @@ footer { visibility:hidden; }
   padding-bottom: 140px !important; /* ruimte onderin zodat CTA niet overlapt */
 }
 
-/* Bookmarklet chip (zoals mock – laat je staan/weg naar smaak) */
+/* Bookmarklet chip */
 .note-chip{
   display:block; margin: 6px 0 14px; padding: 10px 14px;
   border-radius: 14px; background: rgba(255,255,255,0.60);
@@ -73,15 +74,6 @@ li{ margin: 6px 0; }
 .section-h{
   font-weight:800; margin:10px 0 2px; color:#2d2a6c;
 }
-
-/* Pills (optioneel ergens anders te gebruiken) */
-.pills{ display:flex; gap:10px; flex-wrap:wrap; margin-top: 10px; }
-.pill{
-  background:#F6F5FF; color:#2b2b46; border:1px solid #E7E5FF;
-  padding:10px 14px; border-radius: 999px; font-weight:700; text-decoration:none;
-  box-shadow: 0 6px 14px rgba(23,0,75,0.10);
-}
-.pill:hover{ transform: translateY(-1px); }
 
 /* Sticky CTA – rechtsonder met ruimte */
 .cta{
@@ -109,7 +101,7 @@ div[data-testid="stForm"]{
 h1, h2, h3 { letter-spacing:-.02em; }
 .small-note{ color:#6B7280; font-size: 13px; }
 </style>
-""", unsafe_allow_html=True)
+"""), unsafe_allow_html=True)
 
 # ---------- Query params ----------
 qp = st.query_params
@@ -142,7 +134,7 @@ else:
 
 # ---------- Sticky CTA (rechtsonder) ----------
 CHAT_SVG = """<span class="icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 12c0-4.4 3.6-8 8-8s8 3.6 8 8-3.6 8-8 8H9l-4 3v-3.5C4.7 18.3 4 15.3 4 12z" fill="white" opacity="0.9"/></svg></span>"""
-st.markdown(f"""
+st.markdown(dedent(f"""
 <button class="cta" onclick="
   const u = new URL(window.location);
   u.searchParams.set('prefs','1');
@@ -150,10 +142,11 @@ st.markdown(f"""
 ">
   {CHAT_SVG} <span>Vertel iets over jezelf</span>
 </button>
-""", unsafe_allow_html=True)
+"""), unsafe_allow_html=True)
 
 # ---------- Icons ----------
 DRESS_SVG = """<svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3l1.5 3-2 3 2 11h5l2-11-2-3L16 3h-2l-1 2-1-2H8z" fill="#556BFF"/></svg>"""
+LINK_SVG  = """<svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 14l-1 1a4 4 0 105.7 5.7l2.6-2.6a4 4 0 00-5.7-5.7l-.6.6" stroke="#6F5BFF" stroke-width="2" stroke-linecap="round"/><path d="M14 10l1-1a4 4 0 10-5.7-5.7L6.7 5.9a4 4 0 105.7 5.7l.6-.6" stroke="#6F5BFF" stroke-width="2" stroke-linecap="round"/></svg>"""
 
 # ---------- Helpers ----------
 def esc(x) -> str:
@@ -204,7 +197,14 @@ def get_advice_json(link: str) -> dict:
       "fit_color": {"color":["2 bullets"], "fit":["2 bullets"]}
     }
     """
-    profile = f"figuur={lichaamsvorm}, huidskleur={huidskleur}, lengte={lengte}, gelegenheid={gelegenheid}, stijlgevoel={gevoel}"
+    # Defaults als sidebar dicht is
+    fig = st.session_state.get("pf_l", "Weet ik niet")
+    skin = st.session_state.get("pf_h", "Medium")
+    hgt  = st.session_state.get("pf_len", "1.60 - 1.75m")
+    occ  = st.session_state.get("pf_g", "Vrije tijd")
+    vibe = st.session_state.get("pf_ge", "Casual")
+
+    profile = f"figuur={fig}, huidskleur={skin}, lengte={hgt}, gelegenheid={occ}, stijlgevoel={vibe}"
     system = "Je bent een modieuze maar praktische personal stylist. Schrijf in helder Nederlands (B1), kort en concreet."
     user = f"""
 Analyseer dit kledingstuk (URL): {link}
@@ -229,22 +229,17 @@ Regels:
         resp = client.chat.completions.create(
             model=MODEL,
             response_format={"type":"json_object"},
-            messages=[
-                {"role":"system","content":system},
-                {"role":"user","content":user},
-            ],
-            temperature=0.5,
-            max_tokens=450,
+            messages=[{"role":"system","content":system},{"role":"user","content":user}],
+            temperature=0.5, max_tokens=450,
         )
         return json.loads(resp.choices[0].message.content)
     except Exception:
+        # Fallback
         return {
             "intro_lines": ["Zwarte, chunky sneakers; stijlvol en veelzijdig."],
             "combine": ["Rechte jeans of cargobroek", "Oversized blazer of hoodie"],
-            "fit_color": {
-                "color": ["Neutrale kleuren voor balans", "Denim en grijs werken goed"],
-                "fit": ["Strakke broeken voor contrast", "Hou top relaxed-fit"]
-            }
+            "fit_color": {"color": ["Neutrale kleuren voor balans","Denim en grijs werken goed"],
+                          "fit": ["Strakke broeken voor contrast","Hou top relaxed-fit"]}
         }
 
 # ---------- Render: één tekstwolk ----------
@@ -254,7 +249,7 @@ def render_single_card(data: dict):
     colors  = [esc(x) for x in as_list(data.get("fit_color",{}).get("color"))][:2]
     fits    = [esc(x) for x in as_list(data.get("fit_color",{}).get("fit"))][:2]
 
-    st.markdown(f"""
+    html = dedent(f"""
     <div class="card">
       <div class="card-title">
         <svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3l1.5 3-2 3 2 11h5l2-11-2-3L16 3h-2l-1 2-1-2H8z" fill="#556BFF"/></svg>
@@ -275,11 +270,14 @@ def render_single_card(data: dict):
         </ul>
       </div>
     </div>
-    """, unsafe_allow_html=True)
+    """)
+    st.markdown(html, unsafe_allow_html=True)
 
 # ---------- UI ----------
-# (optioneel) de bookmarklet-chip zoals in de mock
-st.markdown("<span class='note-chip'>Bookmarklet: sleep deze AI-stylist naar je bladwijzerbalk en klik op een productpagina.</span>", unsafe_allow_html=True)
+# (optioneel) bookmarklet-tekst zoals in de mock
+st.markdown(dedent("""
+<span class='note-chip'>Bookmarklet: sleep deze AI-stylist naar je bladwijzerbalk en klik op een productpagina.</span>
+"""), unsafe_allow_html=True)
 
 # State voor handmatige link
 if "last_link" not in st.session_state:
@@ -291,9 +289,9 @@ if active_link:
     data = get_advice_json(active_link)
     render_single_card(data)
 
-# Input-veld ONDERAAN in witte card (blijft bestaan)
+# Input-veld ONDERAAN in witte card
 with st.form("manual_bottom", clear_on_submit=False):
-    st.markdown("<div class='card-title'><svg class='icon' viewBox='0 0 24 24' width='22' height='22' fill='none' xmlns='http://www.w3.org/2000/svg'><path d='M10 14l-1 1a4 4 0 105.7 5.7l2.6-2.6a4 4 0 00-5.7-5.7l-.6.6' stroke='#6F5BFF' stroke-width='2' stroke-linecap='round'/><path d='M14 10l1-1a4 4 0 10-5.7-5.7L6.7 5.9a4 4 0 105.7 5.7l.6-.6' stroke='#6F5BFF' stroke-width='2' stroke-linecap='round'/></svg> Plak hier de link van een ander product</div>", unsafe_allow_html=True)
+    st.markdown(dedent(f"<div class='card-title'>{LINK_SVG} Plak hier de link van een ander product</div>"), unsafe_allow_html=True)
     link_in = st.text_input(label="", value="", placeholder="https://…")
     go = st.form_submit_button("Geef advies")
 
