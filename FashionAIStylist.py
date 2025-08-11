@@ -1,12 +1,12 @@
 # app.py
-import os, re, random, json
+import os, re, json
 import streamlit as st
 from urllib.parse import urlparse, quote
 from html import escape as html_escape
 from openai import OpenAI
 
 # ========= Instellingen =========
-APP_URL = "https://fashion-ai-stylis-ifidobqmkgjtn7gjxgrudb.streamlit.app"  # <-- JOUW URL (geen trailing slash)
+APP_URL = "https://fashion-ai-stylis-ifidobqmkgjtn7gjxgrudb.streamlit.app"
 MODEL   = "gpt-4o-mini"
 # =================================
 
@@ -49,7 +49,7 @@ footer { visibility:hidden; }
   margin: 6px 0 14px;
   padding: 12px 16px;
   border-radius: 16px;
-  background: rgba(255,255,255,0.42); /* iets transparanter */
+  background: rgba(255,255,255,0.42);
   border: 1px solid rgba(255,255,255,0.7);
   color:#2d2a6c;
   font-weight:800;
@@ -109,14 +109,13 @@ qp = st.query_params
 def _get(name, default=""):
     v = qp.get(name, default)
     return (v[0] if isinstance(v, list) and v else v) or default
-
 link_qs = _get("u").strip()
 auto    = str(_get("auto","0")) == "1"
 prefs_q = _get("prefs","0") == "1"
 
 # ---------- Sidebar voorkeuren ----------
 if "show_prefs" not in st.session_state:
-    st.session_state.show_prefs = prefs_q  # open als ?prefs=1
+    st.session_state.show_prefs = prefs_q
 
 if st.session_state.show_prefs:
     with st.sidebar:
@@ -145,18 +144,16 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------- Icons ----------
-INFO_SVG = """<svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" stroke="#556BFF" stroke-width="2"/><path d="M12 8h.01M11 11h2v5h-2z" stroke="#556BFF" stroke-width="2" stroke-linecap="round"/></svg>"""
+INFO_SVG   = """<svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" stroke="#556BFF" stroke-width="2"/><path d="M12 8h.01M11 11h2v5h-2z" stroke="#556BFF" stroke-width="2" stroke-linecap="round"/></svg>"""
 HANGER_SVG = """<svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 7a3 3 0 116 0c0 1.5-1 2-2 2v2" stroke="#7B61FF" stroke-width="2" stroke-linecap="round"/><path d="M3 17h18l-9-5-9 5z" stroke="#7B61FF" stroke-width="2" stroke-linecap="round"/></svg>"""
 
 # ---------- Helpers ----------
 def esc(x) -> str:
     return html_escape("" if x is None else str(x))
-
 def as_list(v):
     if v is None: return []
     if isinstance(v, list): return v
     return [v]
-
 def _keywords_from_url(u: str):
     try:
         slug = urlparse(u).path.rstrip("/").split("/")[-1]
@@ -165,40 +162,31 @@ def _keywords_from_url(u: str):
         return " ".join(words[:6]) or "fashion"
     except Exception:
         return "fashion"
-
 def _product_name(u: str):
     kw = _keywords_from_url(u)
     return re.sub(r"\s+", " ", kw).strip().title()
-
 def _host(u: str) -> str:
-    p = urlparse(u)
-    return f"{p.scheme}://{p.netloc}"
-
+    p = urlparse(u); return f"{p.scheme}://{p.netloc}"
 def _shop_searches(u: str, query: str, limit=1):
     host = _host(u); q = quote(query)
-    patterns = [
-        f"/search?q={q}", f"/zoeken?query={q}", f"/s?searchTerm={q}",
-        f"/search?text={q}", f"/catalogsearch/result/?q={q}",
-        f"/nl/search?q={q}", f"/zoeken?q={q}"
-    ]
+    patterns = [f"/search?q={q}", f"/zoeken?query={q}", f"/s?searchTerm={q}",
+                f"/search?text={q}", f"/catalogsearch/result/?q={q}",
+                f"/nl/search?q={q}", f"/zoeken?q={q}"]
     seen, out = set(), []
     for path in patterns:
         full = host + path
-        if full not in seen:
-            out.append(full); seen.add(full)
+        if full not in seen: out.append(full); seen.add(full)
         if len(out) >= limit: break
     return out
-
 def _google_fallback(u: str, query: str):
     p = urlparse(u); host = p.netloc
     q = quote(f"site:{host} {query}")
     return f"https://www.google.com/search?q={q}"
-
 def _build_link_or_fallback(u: str, query: str):
     found = _shop_searches(u, query, limit=1)
     return found[0] if found else _google_fallback(u, query)
 
-# ---------- OpenAI: gestructureerd advies ----------
+# ---------- OpenAI ----------
 def get_advice_json(link: str) -> dict:
     """
     Verwacht JSON:
@@ -248,7 +236,6 @@ Regels:
         )
         return json.loads(resp.choices[0].message.content)
     except Exception:
-        # Fallback
         return {
             "general": {
                 "intro": "Stijlvol item met moderne look. Valt comfortabel en is makkelijk te combineren.",
@@ -265,19 +252,21 @@ Regels:
         }
 
 # ---------- Render ----------
+def product_balloon(u: str):
+    if not u: return
+    name = _product_name(u)
+    st.markdown(f"<div class='balloon'>{esc(name)}</div>", unsafe_allow_html=True)
+
 def render_general(data: dict):
     g = data.get("general", {}) or {}
     intro = esc(g.get("intro","")).strip()
     bullets = [esc(x) for x in as_list(g.get("bullets"))][:3]
-
     st.markdown(f"""
     <div class="card">
       <div class="card-title">{INFO_SVG} Algemeen</div>
       <div class="card-body">
         <p style="margin:0 0 8px; line-height:1.45;">{intro}</p>
-        <ul>
-          {''.join([f"<li>{b}</li>" for b in bullets])}
-        </ul>
+        <ul>{''.join([f"<li>{b}</li>" for b in bullets])}</ul>
       </div>
     </div>
     """, unsafe_allow_html=True)
@@ -286,7 +275,6 @@ def render_wear(link: str, data: dict):
     w = data.get("wear", {}) or {}
     blurb = esc(w.get("blurb",""))
     combos = as_list(w.get("combine_with"))
-
     pills_html = ""
     for c in combos:
         if isinstance(c, dict):
@@ -296,7 +284,6 @@ def render_wear(link: str, data: dict):
             label = esc(str(c)); query = str(c)
         url = _build_link_or_fallback(link, query)
         pills_html += f"<a class='pill' href='{url}' target='_blank'>{label}</a>"
-
     st.markdown(f"""
     <div class="card">
       <div class="card-title">{HANGER_SVG} Draagadvies</div>
@@ -307,36 +294,25 @@ def render_wear(link: str, data: dict):
     </div>
     """, unsafe_allow_html=True)
 
-# ---------- UI ----------
-rendered = False
-advice = None
+# ---------- State & workflow ----------
+if "last_link" not in st.session_state:
+    st.session_state.last_link = ""
 
-# Productnaam-ballon (alleen als er een link is)
-def product_balloon(u: str):
-    if not u: return
-    name = _product_name(u)
-    st.markdown(f"<div class='balloon'>{esc(name)}</div>", unsafe_allow_html=True)
+# 1) Bepaal actieve link (auto uit querystring of laatste handmatige)
+active_link = link_qs if (auto and link_qs) else st.session_state.last_link
 
-# Auto-run
-if link_qs and auto:
-    product_balloon(link_qs)
-    advice = get_advice_json(link_qs)
-    rendered = True
+# 2) Toon output bovenaan
+if active_link:
+    product_balloon(active_link)
+    data = get_advice_json(active_link)
+    render_general(data)
+    render_wear(active_link, data)
 
-# Handmatige invoer
-with st.form("manual"):
-    link = st.text_input("🔗 Plak een productlink", value=link_qs or "", placeholder="https://…")
-    go = st.form_submit_button("Vraag AI om advies")
+# 3) Handmatige invoer ONDERAAN
+with st.form("manual_bottom"):
+    link_in = st.text_input("🔗 Plak hier de link van een ander product", value="", placeholder="https://…")
+    go = st.form_submit_button("Geef advies")
 
-if go and link:
-    product_balloon(link)
-    try:
-        advice = get_advice_json(link)
-        rendered = True
-    except Exception as e:
-        st.error(f"Er ging iets mis bij het ophalen van advies: {e}")
-
-# Render secties
-if rendered and advice:
-    render_general(advice)
-    render_wear(link_qs if auto else link, advice)
+if go and link_in:
+    st.session_state.last_link = link_in.strip()
+    st.rerun()
