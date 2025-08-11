@@ -7,7 +7,8 @@ from openai import OpenAI
 # ========= Instellingen =========
 APP_URL = "https://fashion-ai-stylis-ifidobqmkgjtn7gjxgrudb.streamlit.app"  # <-- JOUW URL (geen trailing slash)
 MODEL   = "gpt-4o-mini"
-SHOW_AVATAR = True   # zet op False om het poppetje te verbergen
+SHOW_AVATAR = True
+LOTTIE_SRC  = "https://assets6.lottiefiles.com/packages/lf20_qp1q7mct.json"  # vervang gerust door je eigen
 # =================================
 
 # --- API key ---
@@ -31,7 +32,9 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
 
 html, body, [data-testid="stAppViewContainer"]{ height:100%; }
-html, body, [class*="stApp"]{ font-family:"Inter", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+html, body, [class*="stApp"]{
+  font-family:"Inter", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+}
 
 /* Paarse gradient background */
 [data-testid="stAppViewContainer"]{
@@ -65,23 +68,20 @@ footer { visibility:hidden; }
   box-shadow: 0 16px 40px rgba(23,0,75,0.18);
   border: 1px solid #F1ECFF;
   margin-top: 18px;
-  position: relative;
+  position: relative; /* nodig voor avatar absolute positioning */
 }
 .card-title{
   font-size: 24px; font-weight: 800; color:#2d2a6c; margin:0 0 8px;
   display:flex; gap:10px; align-items:center;
 }
 
-/* Avatar (inline SVG) */
-.card .avatar {
-  position:absolute; right:16px; top:-8px;
-  width:160px; height:160px; opacity:.95;
-}
-@media (max-width: 640px){
-  .card .avatar{ width:120px; height:120px; top:-10px; right:6px; }
-}
+/* Bullets */
+.section-label{ color:#2d2a6c; font-weight:800; margin-top:10px; margin-bottom:4px; }
+ul.clean{ list-style:none; padding-left:0; margin:0; }
+ul.clean li{ position:relative; padding-left:26px; margin:8px 0; color:#2b2b46; font-size:16px; }
+ul.clean li::before{ content:"•"; position:absolute; left:6px; top:-1px; color:#5d59f6; font-size:24px; line-height:1; }
 
-/* Pills */
+/* Alternatieven - pills */
 .pills{ display:flex; gap:10px; flex-wrap:wrap; }
 .pill{
   background:#F4F3FF; color:#2b2b46; border:1px solid #E5E4FF;
@@ -103,8 +103,23 @@ footer { visibility:hidden; }
 .cta .dot{ width:10px; height:10px; border-radius:50%; background:#6F5BFF; box-shadow:0 0 0 6px rgba(111,91,255,.15); }
 
 /* Inputs */
-.stTextInput > div > div > input, .stSelectbox > div > div { border-radius:12px !important; min-height:42px; }
+.stTextInput > div > div > input, .stSelectbox > div > div {
+  border-radius:12px !important; min-height:42px;
+}
 
+/* Verberg helperknop voor CTA toggle */
+button[id="_pf_toggle"]{ display:none !important; }
+
+/* Avatar in kaart */
+.card .avatar {
+  position:absolute; right:14px; top:-8px;
+  width:160px; height:160px; pointer-events:none;
+}
+@media (max-width: 640px){
+  .card .avatar{ width:120px; height:120px; top:-10px; right:6px; }
+}
+
+/* Typografie */
 h1, h2, h3 { letter-spacing:-.02em; }
 </style>
 """, unsafe_allow_html=True)
@@ -117,12 +132,34 @@ def _get(name, default=""):
 
 link_qs = _get("u").strip()
 auto    = str(_get("auto","0")) == "1"
-prefs_q = _get("prefs","0") == "1"
+
+# ---------- Floating CTA -> opent sidebar ----------
+if "show_prefs" not in st.session_state:
+    st.session_state.show_prefs = False
+
+# helperknop blijft verborgen via CSS
+st.button("_", key="_pf_toggle",
+          on_click=lambda: st.session_state.update(show_prefs=not st.session_state.show_prefs),
+          type="secondary")
+
+st.markdown("""
+<button class="cta" onClick="window.parent.postMessage({fab:1},'*')">
+  <span class="dot"></span> Vertel iets over jezelf
+</button>
+""", unsafe_allow_html=True)
+
+st.components.v1.html("""
+<script>
+window.addEventListener('message',(e)=>{
+  if(e.data && e.data.fab){
+    const b = window.parent.document.querySelector('button[id="_pf_toggle"]');
+    if(b) b.click();
+  }
+});
+</script>
+""", height=0)
 
 # ---------- Sidebar voorkeuren ----------
-if "show_prefs" not in st.session_state:
-    st.session_state.show_prefs = prefs_q  # open als ?prefs=1
-
 if st.session_state.show_prefs:
     with st.sidebar:
         st.markdown("### 👤 Vertel iets over jezelf")
@@ -131,24 +168,9 @@ if st.session_state.show_prefs:
         lengte       = st.selectbox("Lengte",       ["< 1.60m","1.60 - 1.75m","> 1.75m"], index=1, key="pf_len")
         gelegenheid  = st.selectbox("Gelegenheid",  ["Werk","Feest","Vrije tijd","Bruiloft","Date"], index=2, key="pf_g")
         gevoel       = st.selectbox("Gevoel",       ["Zelfverzekerd","Speels","Elegant","Casual","Trendy"], index=3, key="pf_ge")
-        # Sluiten = queryparam verwijderen en herladen
-        if st.button("Sluiten", use_container_width=True):
-            st.session_state.show_prefs = False
-            st.experimental_set_query_params(**{k:v for k,v in qp.items() if k!="prefs"})
-            st.rerun()
+        st.button("Sluiten", use_container_width=True, on_click=lambda: st.session_state.update(show_prefs=False))
 else:
     lichaamsvorm = "Weet ik niet"; huidskleur="Medium"; lengte="1.60 - 1.75m"; gelegenheid="Vrije tijd"; gevoel="Casual"
-
-# ---------- CTA onderin -> zet prefs=1 en reload (geen verborgen knop meer) ----------
-st.markdown("""
-<button class="cta" onclick="
-  const u = new URL(window.location);
-  u.searchParams.set('prefs','1');
-  window.location.replace(u.toString());
-">
-  <span class="dot"></span> Vertel iets over jezelf
-</button>
-""", unsafe_allow_html=True)
 
 # ---------- Helpers ----------
 def _keywords_from_url(u: str):
@@ -207,7 +229,8 @@ def build_shop_alternatives(u: str):
 # ---------- OpenAI calls (eenvoudige taal) ----------
 def get_advice_md(link: str, kort=True) -> str:
     stijl = (
-        "Maak het superkort. Schrijf in eenvoudig Nederlands (B1). Gebruik 3–5 bullets. Max 8 woorden per bullet."
+        "Maak het superkort. Schrijf in eenvoudig Nederlands (B1). "
+        "Gebruik 3–5 bullets. Max 8 woorden per bullet."
         if kort else
         "Gebruik eenvoudige woorden (B1) en korte zinnen."
     )
@@ -239,6 +262,7 @@ Schrijf ALLEEN dit, in het Nederlands:
     return resp.choices[0].message.content
 
 def get_quick_blurb(link: str, item_name: str) -> str:
+    """1 zin, max 20 woorden, Engels, start met 'This <item_name>', simpele woorden."""
     prompt = f"""
 Item: {item_name}
 Link: {link}
@@ -257,8 +281,27 @@ Use only simple, clear words (B1). No jargon. No emojis.
     )
     return resp.choices[0].message.content.strip().rstrip()
 
-# ---------- UI logic ----------
-korte_modus = True  # altijd kort en simpel
+# ---------- Helper: avatar injectie in de laatste kaart ----------
+def inject_avatar(selector=".card", lottie_src=LOTTIE_SRC):
+    if not SHOW_AVATAR:
+        return
+    st.components.v1.html(f"""
+    <div></div>
+    <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+    <script>
+      // Plaats avatar in de eerste kaart op de pagina
+      const card = window.parent.document.querySelector('{selector}');
+      if (card && !card.querySelector('.avatar')){
+        const wrap = document.createElement('div');
+        wrap.className = 'avatar';
+        wrap.innerHTML = `<lottie-player src="{lottie_src}" background="transparent" speed="1" loop autoplay style="width:100%;height:100%;"></lottie-player>`;
+        card.appendChild(wrap);
+      }
+    </script>
+    """, height=0)
+
+# ---------- UI ----------
+korte_modus = True  # geen toggle; altijd kort en simpel
 
 # Voorbereiden ballon/advies
 rendered = False
@@ -279,38 +322,18 @@ if link_qs and auto:
 if balloon_html:
     st.markdown(balloon_html, unsafe_allow_html=True)
 
-# --- Avatar SVG (inline, geen JS/iframe) ---
-AVATAR_SVG = """
-<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
- <defs>
-  <radialGradient id="g" cx="60%" cy="30%" r="80%">
-    <stop offset="0%" stop-color="#c9d4ff"/>
-    <stop offset="60%" stop-color="#94a3ff"/>
-    <stop offset="100%" stop-color="#7a86ff"/>
-  </radialGradient>
- </defs>
- <g>
-  <rect x="0" y="0" width="200" height="200" rx="36" fill="url(#g)"/>
-  <circle cx="110" cy="70" r="22" fill="#F5C8A8"/>
-  <rect x="70" y="92" width="90" height="60" rx="28" fill="#6F79FF"/>
-  <circle cx="95" cy="66" r="4" fill="#633D2E"/>
-  <circle cx="125" cy="66" r="4" fill="#633D2E"/>
-  <path d="M100 78 Q110 86 120 78" stroke="#633D2E" stroke-width="3" fill="none" stroke-linecap="round"/>
- </g>
-</svg>
-"""
-
 # Kaart 1: Kort advies
-avatar_html = f"<div class='avatar'>{AVATAR_SVG}</div>" if SHOW_AVATAR else ""
 st.markdown(f"""
-<div class="card" id="advice-card">
+<div class="card">
   <div class="card-title">Kort advies</div>
-  {avatar_html}
   <div class="card-body">
     {advies_md if rendered else ""}
   </div>
 </div>
 """, unsafe_allow_html=True)
+
+# Avatar in de advieskaart injecteren
+inject_avatar(".card")
 
 # Kaart 2: Alternatieven
 alts = build_shop_alternatives(link_qs) if rendered else []
@@ -330,7 +353,6 @@ with st.form("manual"):
     go = st.form_submit_button("Vraag AI om advies")
 
 if go and link:
-    # open ballon + advies opnieuw
     item_name = _product_name(link)
     quick = get_quick_blurb(link, item_name)
     opener = random.choice(OPENERS)
@@ -343,9 +365,13 @@ if go and link:
     st.markdown(f"""
     <div class="card">
       <div class="card-title">Kort advies</div>
-      {avatar_html}
       <div class="card-body">{advies2}</div>
     </div>
+    """, unsafe_allow_html=True)
+
+    inject_avatar(".card:last-of-type")  # avatar in deze nieuwe advieskaart
+
+    st.markdown(f"""
     <div class="card">
       <div class="card-title">Alternatieven uit deze webshop</div>
       <div class="card-body">
