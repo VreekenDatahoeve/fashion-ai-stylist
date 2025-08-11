@@ -48,6 +48,14 @@ footer { visibility:hidden; }
   padding-bottom: 160px !important; /* ruimte onderin zodat CTA niet overlapt */
 }
 
+/* Bookmarklet chip */
+.note-chip{
+  display:block; margin: 6px 0 14px; padding: 10px 14px;
+  border-radius: 14px; background: rgba(255,255,255,0.60);
+  border: 1px solid rgba(255,255,255,0.75); color:#2d2a6c; font-weight:600;
+  box-shadow: 0 10px 24px rgba(40,12,120,0.15); backdrop-filter: blur(4px);
+}
+
 /* Eén tekstwolk (card) */
 .card{
   background:#ffffff; border-radius: 22px; padding: 18px;
@@ -366,10 +374,6 @@ def render_single_card(data: dict, link: str):
     st.markdown(html, unsafe_allow_html=True)
 
 # ---------- UI ----------
-# (optioneel) bookmarklet-tekst zoals in de mock
-st.markdown(dedent("""
-<span class='note-chip'>Bookmarklet: sleep deze AI-stylist naar je bladwijzerbalk en klik op een productpagina.</span>
-"""), unsafe_allow_html=True)
 
 # State voor handmatige link
 if "last_link" not in st.session_state:
