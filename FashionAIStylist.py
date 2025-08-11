@@ -85,22 +85,31 @@ li{ margin: 4px 0; }
 }
 .pill:hover{ transform: translateY(-1px); }
 
-/* Sticky CTA onderin */
+/* Sticky CTA onderin - paarse pill met chat-icoon */
 .cta{
   position: fixed; left:50%; transform:translateX(-50%);
   bottom: 18px; z-index: 1000;
-  background:#ffffff; color:#2d2a6c;
-  border:1px solid #ECE9FF; border-radius: 24px;
-  padding: 12px 16px; font-weight:800;
-  box-shadow: 0 18px 40px rgba(23,0,75,0.25);
+  background: linear-gradient(180deg, #8C72FF 0%, #6F5BFF 100%);
+  color:#ffffff;
+  border:none;
+  border-radius: 999px;
+  padding: 12px 18px;
+  font-weight:800;
+  box-shadow: 0 16px 36px rgba(23,0,75,0.40);
   display:flex; align-items:center; gap:10px;
 }
-.cta .dot{ width:10px; height:10px; border-radius:50%; background:#6F5BFF; box-shadow:0 0 0 6px rgba(111,91,255,.15); }
+.cta .icon{ width:18px; height:18px; display:inline-block; }
+.cta .icon svg{ width:18px; height:18px; fill:#fff; }
 
-.stTextInput > div > div > input, .stSelectbox > div > div { border-radius:12px !important; min-height:42px; }
-
-h1, h2, h3 { letter-spacing:-.02em; }
-.small-note{ color:#6B7280; font-size: 13px; }
+/* Style de onderliggende Streamlit form als witte card */
+div[data-testid="stForm"]{
+  background:#ffffff !important;
+  border:1px solid #EFEBFF !important;
+  box-shadow: 0 16px 40px rgba(23,0,75,0.18) !important;
+  border-radius:22px !important;
+  padding: 16px !important;
+  margin-top: 12px !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -132,20 +141,22 @@ if st.session_state.show_prefs:
 else:
     lichaamsvorm = "Weet ik niet"; huidskleur="Medium"; lengte="1.60 - 1.75m"; gelegenheid="Vrije tijd"; gevoel="Casual"
 
-# ---------- CTA onderin ----------
-st.markdown("""
+# ---------- Sticky CTA (paarse pill) ----------
+CHAT_SVG = """<span class="icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 12c0-4.4 3.6-8 8-8s8 3.6 8 8-3.6 8-8 8H9l-4 3v-3.5C4.7 18.3 4 15.3 4 12z" fill="white" opacity="0.9"/></svg></span>"""
+st.markdown(f"""
 <button class="cta" onclick="
   const u = new URL(window.location);
   u.searchParams.set('prefs','1');
   window.location.replace(u.toString());
 ">
-  <span class="dot"></span> Vertel iets over jezelf
+  {CHAT_SVG} <span>Vertel iets over jezelf</span>
 </button>
 """, unsafe_allow_html=True)
 
 # ---------- Icons ----------
 INFO_SVG   = """<svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" stroke="#556BFF" stroke-width="2"/><path d="M12 8h.01M11 11h2v5h-2z" stroke="#556BFF" stroke-width="2" stroke-linecap="round"/></svg>"""
 HANGER_SVG = """<svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 7a3 3 0 116 0c0 1.5-1 2-2 2v2" stroke="#7B61FF" stroke-width="2" stroke-linecap="round"/><path d="M3 17h18l-9-5-9 5z" stroke="#7B61FF" stroke-width="2" stroke-linecap="round"/></svg>"""
+LINK_SVG   = """<svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 14l-1 1a4 4 0 105.7 5.7l2.6-2.6a4 4 0 00-5.7-5.7l-.6.6" stroke="#6F5BFF" stroke-width="2" stroke-linecap="round"/><path d="M14 10l1-1a4 4 0 10-5.7-5.7L6.7 5.9a4 4 0 105.7 5.7l.6-.6" stroke="#6F5BFF" stroke-width="2" stroke-linecap="round"/></svg>"""
 
 # ---------- Helpers ----------
 def esc(x) -> str:
@@ -298,19 +309,19 @@ def render_wear(link: str, data: dict):
 if "last_link" not in st.session_state:
     st.session_state.last_link = ""
 
-# 1) Bepaal actieve link (auto uit querystring of laatste handmatige)
 active_link = link_qs if (auto and link_qs) else st.session_state.last_link
 
-# 2) Toon output bovenaan
+# Output bovenaan
 if active_link:
     product_balloon(active_link)
     data = get_advice_json(active_link)
     render_general(data)
     render_wear(active_link, data)
 
-# 3) Handmatige invoer ONDERAAN
-with st.form("manual_bottom"):
-    link_in = st.text_input("🔗 Plak hier de link van een ander product", value="", placeholder="https://…")
+# ---------- Handmatige invoer ONDERAAN (in witte card) ----------
+with st.form("manual_bottom", clear_on_submit=False):
+    st.markdown(f"<div class='card-title'>{LINK_SVG} Plak hier de link van een ander product</div>", unsafe_allow_html=True)
+    link_in = st.text_input(label="", value="", placeholder="https://…")
     go = st.form_submit_button("Geef advies")
 
 if go and link_in:
