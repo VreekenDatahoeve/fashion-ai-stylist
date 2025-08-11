@@ -43,17 +43,17 @@ footer { visibility:hidden; }
 /* Layout breedte */
 .block-container{ max-width: 860px; padding-top: 8px !important; padding-bottom: 96px !important; }
 
-/* Productnaam-ballon */
-.balloon{
+/* Bookmarklet chip */
+.note-chip{
   display:block;
   margin: 6px 0 14px;
-  padding: 12px 16px;
-  border-radius: 16px;
-  background: rgba(255,255,255,0.42);
-  border: 1px solid rgba(255,255,255,0.7);
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.60);
+  border: 1px solid rgba(255,255,255,0.75);
   color:#2d2a6c;
-  font-weight:800;
-  box-shadow: 0 12px 28px rgba(40,12,120,0.16);
+  font-weight:600;
+  box-shadow: 0 10px 24px rgba(40,12,120,0.15);
   backdrop-filter: blur(4px);
 }
 
@@ -67,14 +67,14 @@ footer { visibility:hidden; }
   margin-top: 12px;
 }
 .card-title{
-  font-size: 22px; font-weight: 800; color:#2d2a6c; margin:0 0 10px;
+  font-size: 24px; font-weight: 800; color:#2d2a6c; margin:0 0 10px;
   display:flex; gap:10px; align-items:center;
 }
 .card-body{ color:#2b2b46; }
 
 /* Lijsten */
 ul{ margin: 0 0 0 1.15rem; padding:0; }
-li{ margin: 4px 0; }
+li{ margin: 6px 0; }
 
 /* Pills */
 .pills{ display:flex; gap:10px; flex-wrap:wrap; margin-top: 10px; }
@@ -101,15 +101,10 @@ li{ margin: 4px 0; }
 .cta .icon{ width:18px; height:18px; display:inline-block; }
 .cta .icon svg{ width:18px; height:18px; fill:#fff; }
 
-/* Style de onderliggende Streamlit form als witte card */
-div[data-testid="stForm"]{
-  background:#ffffff !important;
-  border:1px solid #EFEBFF !important;
-  box-shadow: 0 16px 40px rgba(23,0,75,0.18) !important;
-  border-radius:22px !important;
-  padding: 16px !important;
-  margin-top: 12px !important;
-}
+.stTextInput > div > div > input, .stSelectbox > div > div { border-radius:12px !important; min-height:42px; }
+
+h1, h2, h3 { letter-spacing:-.02em; }
+.small-note{ color:#6B7280; font-size: 13px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -118,6 +113,7 @@ qp = st.query_params
 def _get(name, default=""):
     v = qp.get(name, default)
     return (v[0] if isinstance(v, list) and v else v) or default
+
 link_qs = _get("u").strip()
 auto    = str(_get("auto","0")) == "1"
 prefs_q = _get("prefs","0") == "1"
@@ -154,9 +150,8 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ---------- Icons ----------
-INFO_SVG   = """<svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" stroke="#556BFF" stroke-width="2"/><path d="M12 8h.01M11 11h2v5h-2z" stroke="#556BFF" stroke-width="2" stroke-linecap="round"/></svg>"""
-HANGER_SVG = """<svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 7a3 3 0 116 0c0 1.5-1 2-2 2v2" stroke="#7B61FF" stroke-width="2" stroke-linecap="round"/><path d="M3 17h18l-9-5-9 5z" stroke="#7B61FF" stroke-width="2" stroke-linecap="round"/></svg>"""
-LINK_SVG   = """<svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 14l-1 1a4 4 0 105.7 5.7l2.6-2.6a4 4 0 00-5.7-5.7l-.6.6" stroke="#6F5BFF" stroke-width="2" stroke-linecap="round"/><path d="M14 10l1-1a4 4 0 10-5.7-5.7L6.7 5.9a4 4 0 105.7 5.7l.6-.6" stroke="#6F5BFF" stroke-width="2" stroke-linecap="round"/></svg>"""
+DRESS_SVG   = """<svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3l1.5 3-2 3 2 11h5l2-11-2-3L16 3h-2l-1 2-1-2H8z" fill="#556BFF"/></svg>"""
+REFRESH_SVG = """<svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 12a9 9 0 10-2.64 6.36" stroke="#7B61FF" stroke-width="2" stroke-linecap="round"/><path d="M21 12v6h-6" stroke="#7B61FF" stroke-width="2" stroke-linecap="round"/></svg>"""
 
 # ---------- Helpers ----------
 def esc(x) -> str:
@@ -176,6 +171,17 @@ def _keywords_from_url(u: str):
 def _product_name(u: str):
     kw = _keywords_from_url(u)
     return re.sub(r"\s+", " ", kw).strip().title()
+def _category_candidates(u: str):
+    p = urlparse(u)
+    segs = [s for s in p.path.split("/") if s]
+    cands = []
+    if len(segs) >= 2: cands.append("/" + "/".join(segs[:-1]) + "/")
+    if len(segs) >= 3: cands.append("/" + "/".join(segs[:-2]) + "/")
+    seen, out = set(), []
+    for c in cands:
+        if c not in seen:
+            out.append(c); seen.add(c)
+    return [f"{p.scheme}://{p.netloc}{c}" for c in out]
 def _host(u: str) -> str:
     p = urlparse(u); return f"{p.scheme}://{p.netloc}"
 def _shop_searches(u: str, query: str, limit=1):
@@ -197,13 +203,29 @@ def _build_link_or_fallback(u: str, query: str):
     found = _shop_searches(u, query, limit=1)
     return found[0] if found else _google_fallback(u, query)
 
-# ---------- OpenAI ----------
+def build_shop_alternatives(u: str):
+    if not u: return []
+    kw = _keywords_from_url(u)
+    cats = _category_candidates(u)
+    items = []
+    if cats:
+        items.append(("Categorie (zelfde shop)", cats[0]))
+        if len(cats) > 1: items.append(("Bredere categorie", cats[1]))
+    items.append((f"Zoek: {kw}", _build_link_or_fallback(u, kw)))
+    seen, out = set(), []
+    for t, url in items:
+        if url not in seen:
+            out.append((t, url)); seen.add(url)
+    return out[:3]
+
+# ---------- OpenAI: gestructureerd advies ----------
 def get_advice_json(link: str) -> dict:
     """
     Verwacht JSON:
     {
-      "general": {"intro":"max 2 korte zinnen","bullets":["exact 3 bullets"]},
-      "wear": {"blurb":"1 korte zin","combine_with":[{"label":"...","query":"..."}]}
+      "intro_lines": ["1 of 2 korte zinnen"],
+      "combine": ["bullet","bullet"],
+      "fit_color": {"color":["bullet"], "fit":["bullet"]}
     }
     """
     profile = f"figuur={lichaamsvorm}, huidskleur={huidskleur}, lengte={lengte}, gelegenheid={gelegenheid}, stijlgevoel={gevoel}"
@@ -214,25 +236,18 @@ Profiel: {profile}
 
 Geef ALLEEN JSON met exact dit schema:
 {{
-  "general": {{
-    "intro": "max 2 korte zinnen met eerste observatie (pasvorm, materiaal, vibe).",
-    "bullets": ["3 kernpunten: kwaliteit/details", "waarom het werkt", "wanneer te dragen"]
-  }},
-  "wear": {{
-    "blurb": "1 korte zin met draagadvies (hoe te stylen voor de gelegenheid).",
-    "combine_with": [
-      {{"label":"rechte jeans","query":"straight jeans"}},
-      {{"label":"oversized blazer","query":"oversized blazer"}},
-      {{"label":"basic sneakers","query":"witte leren sneakers"}}
-    ]
+  "intro_lines": ["max 2 korte zinnen als eerste observatie over stijl/pasvorm/materiaal"],
+  "combine": ["2 bullets waarmee te combineren (generieke kledingstukken)"],
+  "fit_color": {{
+    "color": ["2 bullets over kleuren die werken"],
+    "fit": ["2 bullets over pasvorm/lengte"]
   }}
 }}
 
 Regels:
 - Geen uitleg buiten JSON.
-- Gebruik B1 Nederlands, korte zinnen.
-- Max 2 zinnen in "general.intro". Precies 3 bullets in "general.bullets".
-- "combine_with" items moeten generiek genoeg zijn om binnen dezelfde webshop te zoeken.
+- B1 Nederlands, korte zinnen; geen emoji of merknamen.
+- Bullets moeten kort zijn (max 8–10 woorden).
 """
     try:
         resp = client.chat.completions.create(
@@ -243,87 +258,72 @@ Regels:
                 {"role":"user","content":user},
             ],
             temperature=0.5,
-            max_tokens=500,
+            max_tokens=450,
         )
         return json.loads(resp.choices[0].message.content)
     except Exception:
+        # Fallback
         return {
-            "general": {
-                "intro": "Stijlvol item met moderne look. Valt comfortabel en is makkelijk te combineren.",
-                "bullets": ["Tijdloos ontwerp", "Neutrale kleur werkt overal bij", "Fijn voor werk en weekend"]
-            },
-            "wear": {
-                "blurb": "Houd de rest simpel en laat het item spreken.",
-                "combine_with": [
-                    {"label":"Rechte jeans","query":"straight jeans"},
-                    {"label":"Oversized blazer","query":"oversized blazer"},
-                    {"label":"Basic sneakers","query":"witte leren sneakers"}
-                ]
+            "intro_lines": [
+                "Zwarte, chunky sneakers; stijlvol en veelzijdig."
+            ],
+            "combine": ["Rechte jeans of cargobroek", "Oversized blazer of hoodie"],
+            "fit_color": {
+                "color": ["Neutrale kleuren voor balans", "Denim en grijs werken goed"],
+                "fit": ["Strakke broeken voor contrast", "Hou top relaxed-fit"]
             }
         }
 
 # ---------- Render ----------
-def product_balloon(u: str):
-    if not u: return
-    name = _product_name(u)
-    st.markdown(f"<div class='balloon'>{esc(name)}</div>", unsafe_allow_html=True)
+def render_kort_advies(data: dict):
+    intro_lines = [esc(x) for x in as_list(data.get("intro_lines"))][:2]
+    combine = [esc(x) for x in as_list(data.get("combine"))][:2]
+    colors  = [esc(x) for x in as_list(data.get("fit_color",{}).get("color"))][:2]
+    fits    = [esc(x) for x in as_list(data.get("fit_color",{}).get("fit"))][:2]
 
-def render_general(data: dict):
-    g = data.get("general", {}) or {}
-    intro = esc(g.get("intro","")).strip()
-    bullets = [esc(x) for x in as_list(g.get("bullets"))][:3]
     st.markdown(f"""
     <div class="card">
-      <div class="card-title">{INFO_SVG} Algemeen</div>
+      <div class="card-title">{DRESS_SVG} Kort advies</div>
       <div class="card-body">
-        <p style="margin:0 0 8px; line-height:1.45;">{intro}</p>
-        <ul>{''.join([f"<li>{b}</li>" for b in bullets])}</ul>
+        <ul>
+          {''.join([f"<li>{x}</li>" for x in intro_lines])}
+        </ul>
+
+        <div style="font-weight:800; margin:10px 0 2px; color:#2d2a6c;">• Combineer met</div>
+        <ul>{''.join([f"<li>{x}</li>" for x in combine])}</ul>
+
+        <div style="font-weight:800; margin:10px 0 2px; color:#2d2a6c;">• Kleur & pasvorm</div>
+        <ul>
+          {''.join([f"<li>{x}</li>" for x in colors])}
+          {''.join([f"<li>{x}</li>" for x in fits])}
+        </ul>
       </div>
     </div>
     """, unsafe_allow_html=True)
 
-def render_wear(link: str, data: dict):
-    w = data.get("wear", {}) or {}
-    blurb = esc(w.get("blurb",""))
-    combos = as_list(w.get("combine_with"))
-    pills_html = ""
-    for c in combos:
-        if isinstance(c, dict):
-            label = esc(c.get("label","Shop"))
-            query = c.get("query", c.get("label","Shop"))
-        else:
-            label = esc(str(c)); query = str(c)
-        url = _build_link_or_fallback(link, query)
-        pills_html += f"<a class='pill' href='{url}' target='_blank'>{label}</a>"
+def render_alternatieven(link: str):
+    pills = build_shop_alternatives(link)
+    pills_html = "".join([f"<a class='pill' href='{u}' target='_blank'>{html_escape(t)}</a>" for t, u in pills])
     st.markdown(f"""
     <div class="card">
-      <div class="card-title">{HANGER_SVG} Draagadvies</div>
+      <div class="card-title">{REFRESH_SVG} Alternatieven uit deze webshop</div>
       <div class="card-body">
-        <p style="margin:0 0 8px; line-height:1.45;">{blurb}</p>
         <div class="pills">{pills_html}</div>
       </div>
     </div>
     """, unsafe_allow_html=True)
 
-# ---------- State & workflow ----------
-if "last_link" not in st.session_state:
-    st.session_state.last_link = ""
+# ---------- UI ----------
+# Bookmarklet-chip (zoals in de mock)
+st.markdown("<span class='note-chip'>Bookmarklet: sleep deze AI-stylist naar je bladwijzerbalk en klik op een productpagina.</span>", unsafe_allow_html=True)
 
-active_link = link_qs if (auto and link_qs) else st.session_state.last_link
+# Actieve link: via querystring
+active_link = link_qs if (auto and link_qs) else link_qs
 
-# Output bovenaan
 if active_link:
-    product_balloon(active_link)
     data = get_advice_json(active_link)
-    render_general(data)
-    render_wear(active_link, data)
+    render_kort_advies(data)
+    render_alternatieven(active_link)
+else:
+    st.info("Tip: open de app met `?u=<product-url>&auto=1` of gebruik de bookmarklet.")
 
-# ---------- Handmatige invoer ONDERAAN (in witte card) ----------
-with st.form("manual_bottom", clear_on_submit=False):
-    st.markdown(f"<div class='card-title'>{LINK_SVG} Plak hier de link van een ander product</div>", unsafe_allow_html=True)
-    link_in = st.text_input(label="", value="", placeholder="https://…")
-    go = st.form_submit_button("Geef advies")
-
-if go and link_in:
-    st.session_state.last_link = link_in.strip()
-    st.rerun()
