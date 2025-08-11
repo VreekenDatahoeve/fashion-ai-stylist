@@ -43,23 +43,10 @@ footer { visibility:hidden; }
 /* Layout breedte */
 .block-container{ max-width: 860px; padding-top: 8px !important; padding-bottom: 96px !important; }
 
-/* Chips / ballonnen */
-.note-chip{
-  display:block;
-  margin: 6px 0 14px;
-  padding: 10px 14px;
-  border-radius: 14px;
-  background: rgba(255,255,255,0.60);
-  border: 1px solid rgba(255,255,255,0.75);
-  color:#2d2a6c;
-  font-weight:600;
-  box-shadow: 0 10px 24px rgba(40,12,120,0.15);
-  backdrop-filter: blur(4px);
-}
-
+/* Productnaam-ballon */
 .balloon{
   display:block;
-  margin: 0 0 14px;
+  margin: 6px 0 14px;
   padding: 12px 16px;
   border-radius: 16px;
   background: rgba(255,255,255,0.42); /* iets transparanter */
@@ -321,9 +308,6 @@ def render_wear(link: str, data: dict):
     """, unsafe_allow_html=True)
 
 # ---------- UI ----------
-# Info-chip (bookmarklet tekst)
-st.markdown("<span class='note-chip'>Bookmarklet: sleep deze AI-stylist naar je bladwijzerbalk en klik op een productpagina.</span>", unsafe_allow_html=True)
-
 rendered = False
 advice = None
 
