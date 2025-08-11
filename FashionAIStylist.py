@@ -1,4 +1,4 @@
-# app.py — Krachtiger adviesversie (split observatie + persoonlijk advies)
+# app.py — Krachtiger adviesversie
 import os, re, json
 import streamlit as st
 from urllib.parse import urlparse, quote
@@ -75,7 +75,7 @@ li{ margin: 6px 0; }
   font-weight:800; margin:12px 0 6px; color:#2d2a6c; display:flex; align-items:center; gap:8px;
 }
 
-/* Verdict badge (optioneel, nu niet gebruikt) */
+/* Verdict badge */
 .badge{ display:inline-flex; align-items:center; gap:8px; font-weight:800; padding:6px 10px; border-radius:999px; font-size:12px; }
 .badge svg{ width:16px; height:16px; }
 .badge.doen{ background:#E8FFF3; color:#046C4E; border:1px solid #C7F5DB; }
@@ -120,6 +120,7 @@ h1, h2, h3 { letter-spacing:-.02em; }
 
 # ---------- Query params ----------
 qp = st.query_params
+
 def _get(name, default=""):
     v = qp.get(name, default)
     return (v[0] if isinstance(v, list) and v else v) or default
@@ -181,29 +182,6 @@ def _keywords_from_url(u: str):
     except Exception:
         return "fashion"
 
-def _detect_category(u: str) -> str:
-    kw = _keywords_from_url(u).lower()
-    tokens = set(kw.split())
-    mapping = [
-        ("badpak", {"badpak","swim","swimsuit"}),
-        ("bikini", {"bikini"}),
-        ("jurk", {"jurk","dress"}),
-        ("jeans", {"jeans","denim"}),
-        ("t-shirt", {"tshirt","t-shirt","tee"}),
-        ("trui/hoodie", {"trui","sweater","hoodie"}),
-        ("blazer/jas", {"blazer","jas","jacket","coat","mantel"}),
-        ("rok", {"rok","skirt"}),
-        ("short", {"short","shorts"}),
-        ("blouse", {"blouse","shirt"}),
-        ("vest/cardigan", {"vest","cardigan"}),
-        ("polo", {"polo"}),
-        ("schoenen", {"sneaker","sneakers","shoe","shoes","laars","laarzen","boots"}),
-    ]
-    for cat, keys in mapping:
-        if any(k in tokens for k in keys):
-            return cat
-    return "fashion-item"
-
 def _product_name(u: str):
     kw = _keywords_from_url(u)
     return re.sub(r"\s+", " ", kw).strip().title()
@@ -232,7 +210,7 @@ def _build_link_or_fallback(u: str, query: str):
     found = _shop_searches(u, query, limit=1)
     return found[0] if found else _google_fallback(u, query)
 
-# ---------- JSON schema (split) ----------
+# ---------- OpenAI: krachtig advies in één tekstwolk ----------
 SCHEMA_HINT = {
   "headline": "max 10 woorden samenvatting",
   "item_observation": {
@@ -253,7 +231,7 @@ SCHEMA_HINT = {
   "checks": ["exact 2 bullets met concrete checks op productpagina (samenstelling, lengte cm, voering, waslabel)"]
 }
 
-# ---------- OpenAI call ----------
+
 def get_advice_json(link: str) -> dict:
     # Defaults als sidebar dicht is
     fig = st.session_state.get("pf_l", "Weet ik niet")
@@ -304,7 +282,6 @@ Belangrijk:
             temperature=0.4, max_tokens=600,
         )
         data = json.loads(resp.choices[0].message.content)
-
         # Minimale validatie + fallbacks voor nieuw schema
         data.setdefault("headline", product_name or "Snel advies")
 
@@ -326,7 +303,6 @@ Belangrijk:
         data.setdefault("care_quality", [])
         data.setdefault("checks", [])
         return data
-
     except Exception:
         # Fallback — veilig en neutraal (nieuw schema)
         return {
@@ -360,7 +336,15 @@ Belangrijk:
             "checks": ["Samenstelling en waslabel", "Lengte in cm/maattabel"]
         }
 
-# ---------- Render ----------
+# ---------- Render: één sterke tekstwolk ----------
+
+def verdict_class(v: str) -> str:
+    v = (v or "").strip().lower()
+    if v.startswith("doen"): return "doen"
+    if v.startswith("over"): return "overslaan"
+    return "twijfel"
+
+
 def render_single_card(data: dict, link: str):
     product_name = _product_name(link)
     headline = esc(data.get("headline", product_name or "Kort advies"))
@@ -444,9 +428,12 @@ def render_single_card(data: dict, link: str):
   </div>
 </div>
 """
-    st.markdown(html, unsafe_allow_html=True)
+    clean_html = dedent(html).strip("
+")
+    st.markdown(clean_html, unsafe_allow_html=True)
 
 # ---------- UI ----------
+# (optioneel) bookmarklet-tekst zoals in de mock
 st.markdown(dedent("""
 <span class='note-chip'>Bookmarklet: sleep deze AI-stylist naar je bladwijzerbalk en klik op een productpagina.</span>
 """), unsafe_allow_html=True)
