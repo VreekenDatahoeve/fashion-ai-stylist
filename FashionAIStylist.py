@@ -361,18 +361,6 @@ def render_single_card(data: dict, link: str):
 """
     st.markdown(_html_noindent(html), unsafe_allow_html=True)
 
-    # --- Micro-feedback (MVP)
-    fb_key = f"fb_{abs(hash(link))}"
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("👍 Nuttig", key=fb_key+"_up"):
-            st.session_state[fb_key] = "up"
-    with col2:
-        if st.button("👎 Niet nuttig", key=fb_key+"_down"):
-            st.session_state[fb_key] = "down"
-    if st.session_state.get(fb_key):
-        st.caption("Bedankt voor je feedback! We verbeteren het advies continu.")
-
 # ---------- Render kaart 2: bijpassende links + inline CTA ----------
 def render_matching_links_card(data: dict, link: str):
     pers = data.get("personal_advice", {})
@@ -432,9 +420,6 @@ def render_matching_links_card(data: dict, link: str):
     st.markdown(_html_noindent(html), unsafe_allow_html=True)
 
 # ---------- UI ----------
-st.markdown(dedent("""
-<span class='note-chip'>Bookmarklet: sleep deze AI-stylist naar je bladwijzerbalk en klik op een productpagina.</span>
-"""), unsafe_allow_html=True)
 
 # State voor handmatige link
 if "last_link" not in st.session_state:
