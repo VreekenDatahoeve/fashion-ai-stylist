@@ -239,25 +239,14 @@ def _html_noindent(s: str) -> str:
 
 # ---------- OpenAI: krachtig advies in één tekstwolk ----------
 SCHEMA_HINT = {
-  "headline": "max 10 woorden samenvatting",
-  "item_observation": {
-    "what_it_is": "kort wat voor item/categorie",
-    "traits": ["exact 3 bullets met algemene, categorie-typische kenmerken (geen speculatie)"]
-  },
+  "headline": "max 8 woorden samenvatting",
   "personal_advice": {
     "for_you": ["exact 3 bullets met persoonlijk advies op basis van profiel"],
-    "avoid": ["exact 2 bullets met wat te vermijden voor dit profiel"],
-    "size_fit": {
-      "size_tip": "kort maatadvies, refereer waar mogelijk aan opgegeven maten",
-      "fit_tips": ["exact 2 bullets over pasvorm/lengte"]
-    },
-    "colors": ["exact 2 bullets over passende kleuren t.o.v. huidskleur"],
+    "avoid":   ["exact 2 bullets met wat te vermijden voor dit profiel"],
+    "colors":  ["exact 2 bullets met passende kleuren t.o.v. huidskleur"],
     "combine": ["exact 2 bullets met combinaties (generieke items), afgestemd op gelegenheid/vibe"]
-  },
-  "care_quality": ["exact 2 bullets over stof/kwaliteit/onderhoud (algemeen, niet-speculatief)"],
-  "checks": ["exact 2 bullets met concrete checks op productpagina (samenstelling, lengte cm, voering, waslabel)"]
+  }
 }
-
 
 def get_advice_json(link: str) -> dict:
     # Defaults als sidebar dicht is
