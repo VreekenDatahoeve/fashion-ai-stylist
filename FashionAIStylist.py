@@ -182,6 +182,29 @@ def _keywords_from_url(u: str):
     except Exception:
         return "fashion"
 
+def _detect_category(u: str) -> str:
+    kw = _keywords_from_url(u).lower()
+    tokens = set(kw.split())
+    mapping = [
+        ("badpak", {"badpak","swim","swimsuit"}),
+        ("bikini", {"bikini"}),
+        ("jurk", {"jurk","dress"}),
+        ("jeans", {"jeans","denim"}),
+        ("t-shirt", {"tshirt","t-shirt","tee"}),
+        ("trui/hoodie", {"trui","sweater","hoodie"}),
+        ("blazer/jas", {"blazer","jas","jacket","coat","mantel"}),
+        ("rok", {"rok","skirt"}),
+        ("short", {"short","shorts"}),
+        ("blouse", {"blouse","shirt"}),
+        ("vest/cardigan", {"vest","cardigan"}),
+        ("polo", {"polo"}),
+        ("schoenen", {"sneaker","sneakers","shoe","shoes","laars","laarzen","boots"}),
+    ]
+    for cat, keys in mapping:
+        if any(k in tokens for k in keys):
+            return cat
+    return "fashion-item"
+
 def _product_name(u: str):
     kw = _keywords_from_url(u)
     return re.sub(r"\s+", " ", kw).strip().title()
@@ -429,9 +452,9 @@ def render_single_card(data: dict, link: str):
 </div>
 """
 
-# onderaan in render_single_card(...)
-clean_html = dedent(html).strip("\n")  # of gewoon .strip()
-st.markdown(clean_html, unsafe_allow_html=True)
+    # onderaan in render_single_card(...)
+    clean_html = dedent(html).strip("\n")  # of gewoon .strip()
+    st.markdown(clean_html, unsafe_allow_html=True)
 
 # ---------- UI ----------
 # (optioneel) bookmarklet-tekst zoals in de mock
