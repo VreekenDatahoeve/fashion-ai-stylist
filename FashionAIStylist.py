@@ -400,9 +400,6 @@ def render_matching_links_card(data: dict, link: str):
     st.markdown(_html_noindent(html), unsafe_allow_html=True)
 
 # ---------- UI ----------
-st.markdown(dedent("""
-<span class='note-chip'>Bookmarklet: sleep deze AI-stylist naar je bladwijzerbalk en klik op een productpagina.</span>
-"""), unsafe_allow_html=True)
 
 # State voor handmatige link
 if "last_link" not in st.session_state:
