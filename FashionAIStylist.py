@@ -1,4 +1,4 @@
-# app.py — Krachtiger adviesversie (2 kaarten: advies + bijpassende links)
+# app.py — MVP: Advies + Bijpassende links (robuust)
 import os, re, json
 import streamlit as st
 from urllib.parse import urlparse, quote
@@ -45,7 +45,7 @@ footer { visibility:hidden; }
 .block-container{
   max-width: 860px;
   padding-top: 8px !important;
-  padding-bottom: 160px !important; /* ruimte onderin zodat CTA niet overlapt */
+  padding-bottom: 160px !important;
 }
 
 /* Bookmarklet chip */
@@ -56,7 +56,7 @@ footer { visibility:hidden; }
   box-shadow: 0 10px 24px rgba(40,12,120,0.15); backdrop-filter: blur(4px);
 }
 
-/* Eén tekstwolk (card) */
+/* Kaarten */
 .card{
   background:#ffffff; border-radius: 22px; padding: 18px;
   box-shadow: 0 16px 40px rgba(23,0,75,0.18); border: 1px solid #EFEBFF;
@@ -70,12 +70,12 @@ footer { visibility:hidden; }
 ul{ margin: 0 0 0 1.15rem; padding:0; }
 li{ margin: 6px 0; }
 
-/* “Subkopjes” in dezelfde card */
+/* Subkopjes */
 .section-h{
   font-weight:800; margin:12px 0 6px; color:#2d2a6c; display:flex; align-items:center; gap:8px;
 }
 
-/* CTA knoppen */
+/* Knoppenrij */
 .btnrow{ display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; }
 .btn{
   display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px;
@@ -95,7 +95,7 @@ li{ margin: 6px 0; }
 .cta .icon{ width:18px; height:18px; display:inline-block; }
 .cta .icon svg{ width:18px; height:18px; fill:#fff; }
 
-/* Input-card onderaan in dezelfde stijl */
+/* Input-card */
 div[data-testid="stForm"]{
   background:#ffffff !important;
   border:1px solid #EFEBFF !important;
@@ -141,7 +141,7 @@ if st.session_state.show_prefs:
 else:
     lichaamsvorm = "Weet ik niet"; huidskleur="Medium"; lengte="1.60 - 1.75m"; gelegenheid="Vrije tijd"; gevoel="Casual"
 
-# ---------- Sticky CTA (rechtsonder) ----------
+# ---------- Sticky CTA ----------
 CHAT_SVG = """<span class="icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 12c0-4.4 3.6-8 8-8s8 3.6 8 8-3.6 8-8 8H9l-4 3v-3.5C4.7 18.3 4 15.3 4 12z" fill="white" opacity="0.9"/></svg></span>"""
 st.markdown(dedent(f"""
 <button class="cta" onclick="
@@ -207,26 +207,36 @@ def _build_link_or_fallback(u: str, query: str):
     found = _shop_searches(u, query, limit=1)
     return found[0] if found else _google_fallback(u, query)
 
-# Combine bullets → zoekqueries
+# Combine bullets → zoekqueries (robuuster)
+_STOPWORDS_RE = re.compile(
+    r"\b(?:combineer met|draag|voor|met|op|onder|bij|een|de|het|je|jouw|casual|look|outfit|relaxte?|ontspannen|vibe)\b",
+    re.IGNORECASE,
+)
+_SEP_RE = re.compile(r"\b(?:of|en|,|/|\+|&)\b", re.IGNORECASE)
+
+def _normalize_query_piece(p: str) -> str:
+    p = re.sub(r"[^0-9A-Za-zÀ-ÿ\- ]+", "", p)
+    p = re.sub(r"\s+", " ", p).strip()
+    return p
+
 def _query_from_bullet(text: str):
     s = str(text or "")
-    s = re.sub(r"(?i)(combineer met|draag|voor|met|op|onder|bij|een|de|het|je|jouw|casual|look|outfit)", " ", s)
-    parts = re.split(r"\b(?:of|en|,|/|\+|&)\b", s)
+    s = _STOPWORDS_RE.sub(" ", s)
+    parts = _SEP_RE.split(s)
     out = []
     for p in parts:
-        p = re.sub(r"[^0-9A-Za-zÀ-ÿ\- ]+", "", p).strip()
-        p = re.sub(r"\s+", " ", p)
-        if p and len(p) > 1:
+        p = _normalize_query_piece(p)
+        if len(p) >= 3 and p.lower() not in {"kleur", "kleuren", "top", "bovenstuk"}:
             out.append(p)
     return out[:2]
 
-def _queries_from_combine(bullets, max_links=6):
+def _queries_from_combine(bullets, max_links=4):
     seen, out = set(), []
     for b in as_list(bullets):
         for q in _query_from_bullet(b):
-            ql = q.lower()
-            if ql not in seen:
-                out.append(q); seen.add(ql)
+            qn = q.lower()
+            if qn not in seen:
+                out.append(q); seen.add(qn)
             if len(out) >= max_links:
                 return out
     return out
@@ -299,7 +309,7 @@ Schrijfregels:
 
         return data
     except Exception:
-        # Fallback — veilig en neutraal (nieuw schema)
+        # Fallback — veilig en neutraal
         return {
             "headline": product_name or "Snel advies",
             "personal_advice": {
@@ -364,12 +374,24 @@ def render_single_card(data: dict, link: str):
 """
     st.markdown(_html_noindent(html), unsafe_allow_html=True)
 
+    # --- Micro-feedback (MVP)
+    fb_key = f"fb_{abs(hash(link))}"
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("👍 Nuttig", key=fb_key+"_up"):
+            st.session_state[fb_key] = "up"
+    with col2:
+        if st.button("👎 Niet nuttig", key=fb_key+"_down"):
+            st.session_state[fb_key] = "down"
+
+    if st.session_state.get(fb_key):
+        st.caption("Bedankt voor je feedback! We verbeteren het advies continu.")
+
 # ---------- Render kaart 2: bijpassende links ----------
 def render_matching_links_card(data: dict, link: str):
     pers = data.get("personal_advice", {})
     combine_raw = as_list(pers.get("combine"))
-    queries = _queries_from_combine(combine_raw, max_links=6)
-
+    queries = _queries_from_combine(combine_raw, max_links=4)
     if not queries:
         return
 
@@ -385,14 +407,14 @@ def render_matching_links_card(data: dict, link: str):
 <div class="card">
   <div class="card-title">
     <svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3l1.5 3-2 3 2 11h5l2-11-2-3L16 3h-2l-1 2-1-2H8z" fill="#556BFF"/></svg>
-    Bijpassende kleding
+    Bijpassende kleding (op deze shop)
   </div>
   <div class="card-body">
-    <div class="btnrow">
+    <div class="btnrow" style="margin-top:4px;">
       {''.join(buttons)}
     </div>
-    <div class="small-note" style="margin-top:10px;">
-      We zoeken eerst binnen deze shop; als dat niet kan, dan via Google.
+    <div class="small-note" style="margin-top:12px;">
+      We zoeken eerst binnen deze shop; lukt dat niet, dan via Google.
     </div>
   </div>
 </div>
@@ -400,6 +422,9 @@ def render_matching_links_card(data: dict, link: str):
     st.markdown(_html_noindent(html), unsafe_allow_html=True)
 
 # ---------- UI ----------
+st.markdown(dedent("""
+<span class='note-chip'>Bookmarklet: sleep deze AI-stylist naar je bladwijzerbalk en klik op een productpagina.</span>
+"""), unsafe_allow_html=True)
 
 # State voor handmatige link
 if "last_link" not in st.session_state:
