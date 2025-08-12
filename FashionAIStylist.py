@@ -1,4 +1,4 @@
-# app.py — MVP: Advies + Bijpassende links (robuust)
+# app.py — MVP: Advies + Bijpassende links (inline CTA onder tweede kaart)
 import os, re, json
 import streamlit as st
 from urllib.parse import urlparse, quote
@@ -41,11 +41,11 @@ html, body, [class*="stApp"]{ font-family:"Inter", system-ui, -apple-system, Seg
 [data-testid="stHeader"] { display:none; }
 footer { visibility:hidden; }
 
-/* Layout breedte + extra onderruimte voor de floating CTA */
+/* Layout breedte + extra onderruimte */
 .block-container{
   max-width: 860px;
   padding-top: 8px !important;
-  padding-bottom: 160px !important;
+  padding-bottom: 80px !important;
 }
 
 /* Bookmarklet chip */
@@ -83,17 +83,17 @@ li{ margin: 6px 0; }
 }
 .btn svg{ width:18px; height:18px; }
 
-/* Sticky CTA – rechtsonder */
-.cta{
-  position: fixed; right: 22px; bottom: 22px; z-index: 1000;
+/* Inline CTA (geen fixed position) */
+.cta-inline{ display:flex; justify-content:flex-end; margin-top: 8px; }
+.cta-btn{
   background: linear-gradient(180deg, #8C72FF 0%, #6F5BFF 100%);
   color:#ffffff; border:none; border-radius: 999px;
   padding: 12px 18px; font-weight:800;
   box-shadow: 0 16px 36px rgba(23,0,75,0.40);
-  display:flex; align-items:center; gap:10px;
+  display:inline-flex; align-items:center; gap:10px; cursor:pointer;
 }
-.cta .icon{ width:18px; height:18px; display:inline-block; }
-.cta .icon svg{ width:18px; height:18px; fill:#fff; }
+.cta-btn .icon{ width:18px; height:18px; display:inline-block; }
+.cta-btn .icon svg{ width:18px; height:18px; fill:#fff; }
 
 /* Input-card */
 div[data-testid="stForm"]{
@@ -141,21 +141,10 @@ if st.session_state.show_prefs:
 else:
     lichaamsvorm = "Weet ik niet"; huidskleur="Medium"; lengte="1.60 - 1.75m"; gelegenheid="Vrije tijd"; gevoel="Casual"
 
-# ---------- Sticky CTA ----------
-CHAT_SVG = """<span class="icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 12c0-4.4 3.6-8 8-8s8 3.6 8 8-3.6 8-8 8H9l-4 3v-3.5C4.7 18.3 4 15.3 4 12z" fill="white" opacity="0.9"/></svg></span>"""
-st.markdown(dedent(f"""
-<button class="cta" onclick="
-  const u = new URL(window.location);
-  u.searchParams.set('prefs','1');
-  window.location.replace(u.toString());
-">
-  {CHAT_SVG} <span>Vertel iets over jezelf</span>
-</button>
-"""), unsafe_allow_html=True)
-
 # ---------- Icons ----------
 DRESS_SVG = """<svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3l1.5 3-2 3 2 11h5l2-11-2-3L16 3h-2l-1 2-1-2H8z" fill="#556BFF"/></svg>"""
 LINK_SVG  = """<svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 14l-1 1a4 4 0 105.7 5.7l2.6-2.6a4 4 0 00-5.7-5.7l-.6.6" stroke="#6F5BFF" stroke-width="2" stroke-linecap="round"/><path d="M14 10l1-1a4 4 0 10-5.7-5.7L6.7 5.9a4 4 0 105.7 5.7l.6-.6" stroke="#6F5BFF" stroke-width="2" stroke-linecap="round"/></svg>"""
+CHAT_SVG = """<span class="icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 12c0-4.4 3.6-8 8-8s8 3.6 8 8-3.6 8-8 8H9l-4 3v-3.5C4.7 18.3 4 15.3 4 12z" fill="white" opacity="0.9"/></svg></span>"""
 
 # ---------- Helpers ----------
 def esc(x) -> str:
@@ -167,7 +156,6 @@ def as_list(v):
     return [v]
 
 def _html_noindent(s: str) -> str:
-    # verwijder alle leidende spaties per regel → geen codeblokken
     return "\n".join(line.lstrip() for line in s.splitlines())
 
 def _keywords_from_url(u: str):
@@ -241,7 +229,7 @@ def _queries_from_combine(bullets, max_links=4):
                 return out
     return out
 
-# ---------- JSON schema (alleen persoonlijk advies) ----------
+# ---------- JSON schema ----------
 SCHEMA_HINT = {
   "headline": "max 8 woorden samenvatting",
   "personal_advice": {
@@ -254,7 +242,6 @@ SCHEMA_HINT = {
 
 # ---------- OpenAI call ----------
 def get_advice_json(link: str) -> dict:
-    # Defaults als sidebar dicht is
     fig = st.session_state.get("pf_l", "Weet ik niet")
     skin = st.session_state.get("pf_h", "Medium")
     hgt  = st.session_state.get("pf_len", "1.60 - 1.75m")
@@ -374,12 +361,37 @@ def render_single_card(data: dict, link: str):
 """
     st.markdown(_html_noindent(html), unsafe_allow_html=True)
 
-# ---------- Render kaart 2: bijpassende links ----------
+    # --- Micro-feedback (MVP)
+    fb_key = f"fb_{abs(hash(link))}"
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("👍 Nuttig", key=fb_key+"_up"):
+            st.session_state[fb_key] = "up"
+    with col2:
+        if st.button("👎 Niet nuttig", key=fb_key+"_down"):
+            st.session_state[fb_key] = "down"
+    if st.session_state.get(fb_key):
+        st.caption("Bedankt voor je feedback! We verbeteren het advies continu.")
+
+# ---------- Render kaart 2: bijpassende links + inline CTA ----------
 def render_matching_links_card(data: dict, link: str):
     pers = data.get("personal_advice", {})
     combine_raw = as_list(pers.get("combine"))
     queries = _queries_from_combine(combine_raw, max_links=4)
     if not queries:
+        # Toon alleen inline CTA als er geen queries zijn
+        html_only_cta = f"""
+<div class="cta-inline">
+  <button class="cta-btn" onclick="
+    const u = new URL(window.location);
+    u.searchParams.set('prefs','1');
+    window.location.replace(u.toString());
+  ">
+    {CHAT_SVG} <span>Vertel iets over jezelf</span>
+  </button>
+</div>
+"""
+        st.markdown(_html_noindent(html_only_cta), unsafe_allow_html=True)
         return
 
     LINK_SVG2 = "<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'><path d='M3.9 12a5 5 0 015-5h3v2h-3a3 3 0 100 6h3v2h-3a5 5 0 01-5-5zm7-3h3a5 5 0 110 10h-3v-2h3a3 3 0 100-6h-3V9z'/></svg>"
@@ -405,10 +417,24 @@ def render_matching_links_card(data: dict, link: str):
     </div>
   </div>
 </div>
+
+<!-- Inline CTA direct onder de kaart -->
+<div class="cta-inline">
+  <button class="cta-btn" onclick="
+    const u = new URL(window.location);
+    u.searchParams.set('prefs','1');
+    window.location.replace(u.toString());
+  ">
+    {CHAT_SVG} <span>Vertel iets over jezelf</span>
+  </button>
+</div>
 """
     st.markdown(_html_noindent(html), unsafe_allow_html=True)
 
 # ---------- UI ----------
+st.markdown(dedent("""
+<span class='note-chip'>Bookmarklet: sleep deze AI-stylist naar je bladwijzerbalk en klik op een productpagina.</span>
+"""), unsafe_allow_html=True)
 
 # State voor handmatige link
 if "last_link" not in st.session_state:
@@ -419,7 +445,7 @@ active_link = link_qs if (auto and link_qs) else st.session_state.last_link
 if active_link:
     data = get_advice_json(active_link)
     render_single_card(data, active_link)          # Kaart 1: advies
-    render_matching_links_card(data, active_link)  # Kaart 2: bijpassende links
+    render_matching_links_card(data, active_link)  # Kaart 2: bijpassende links (+ inline CTA)
 
 # Input-veld ONDERAAN in witte card
 with st.form("manual_bottom", clear_on_submit=False):
