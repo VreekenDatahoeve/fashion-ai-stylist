@@ -428,9 +428,10 @@ def render_single_card(data: dict, link: str):
   </div>
 </div>
 """
-    clean_html = dedent(html).strip("
-")
-    st.markdown(clean_html, unsafe_allow_html=True)
+
+# onderaan in render_single_card(...)
+clean_html = dedent(html).strip("\n")  # of gewoon .strip()
+st.markdown(clean_html, unsafe_allow_html=True)
 
 # ---------- UI ----------
 # (optioneel) bookmarklet-tekst zoals in de mock
