@@ -1,4 +1,4 @@
-# app.py — Krachtiger adviesversie
+# app.py — Krachtiger adviesversie (2 kaarten: advies + bijpassende links)
 import os, re, json
 import streamlit as st
 from urllib.parse import urlparse, quote
@@ -74,13 +74,6 @@ li{ margin: 6px 0; }
 .section-h{
   font-weight:800; margin:12px 0 6px; color:#2d2a6c; display:flex; align-items:center; gap:8px;
 }
-
-/* Verdict badge */
-.badge{ display:inline-flex; align-items:center; gap:8px; font-weight:800; padding:6px 10px; border-radius:999px; font-size:12px; }
-.badge svg{ width:16px; height:16px; }
-.badge.doen{ background:#E8FFF3; color:#046C4E; border:1px solid #C7F5DB; }
-.badge.twijfel{ background:#FFF7E6; color:#92400E; border:1px solid #FFE0B2; }
-.badge.overslaan{ background:#FFE8E8; color:#7F1D1D; border:1px solid #FFC9C9; }
 
 /* CTA knoppen */
 .btnrow{ display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; }
@@ -173,6 +166,10 @@ def as_list(v):
     if isinstance(v, list): return v
     return [v]
 
+def _html_noindent(s: str) -> str:
+    # verwijder alle leidende spaties per regel → geen codeblokken
+    return "\n".join(line.lstrip() for line in s.splitlines())
+
 def _keywords_from_url(u: str):
     try:
         slug = urlparse(u).path.rstrip("/").split("/")[-1]
@@ -181,29 +178,6 @@ def _keywords_from_url(u: str):
         return " ".join(words[:8]) or "fashion"
     except Exception:
         return "fashion"
-
-def _detect_category(u: str) -> str:
-    kw = _keywords_from_url(u).lower()
-    tokens = set(kw.split())
-    mapping = [
-        ("badpak", {"badpak","swim","swimsuit"}),
-        ("bikini", {"bikini"}),
-        ("jurk", {"jurk","dress"}),
-        ("jeans", {"jeans","denim"}),
-        ("t-shirt", {"tshirt","t-shirt","tee"}),
-        ("trui/hoodie", {"trui","sweater","hoodie"}),
-        ("blazer/jas", {"blazer","jas","jacket","coat","mantel"}),
-        ("rok", {"rok","skirt"}),
-        ("short", {"short","shorts"}),
-        ("blouse", {"blouse","shirt"}),
-        ("vest/cardigan", {"vest","cardigan"}),
-        ("polo", {"polo"}),
-        ("schoenen", {"sneaker","sneakers","shoe","shoes","laars","laarzen","boots"}),
-    ]
-    for cat, keys in mapping:
-        if any(k in tokens for k in keys):
-            return cat
-    return "fashion-item"
 
 def _product_name(u: str):
     kw = _keywords_from_url(u)
@@ -233,11 +207,31 @@ def _build_link_or_fallback(u: str, query: str):
     found = _shop_searches(u, query, limit=1)
     return found[0] if found else _google_fallback(u, query)
 
-def _html_noindent(s: str) -> str:
-    # verwijder alle leidende spaties per regel → geen codeblokken
-    return "\n".join(line.lstrip() for line in s.splitlines())
+# Combine bullets → zoekqueries
+def _query_from_bullet(text: str):
+    s = str(text or "")
+    s = re.sub(r"(?i)(combineer met|draag|voor|met|op|onder|bij|een|de|het|je|jouw|casual|look|outfit)", " ", s)
+    parts = re.split(r"\b(?:of|en|,|/|\+|&)\b", s)
+    out = []
+    for p in parts:
+        p = re.sub(r"[^0-9A-Za-zÀ-ÿ\- ]+", "", p).strip()
+        p = re.sub(r"\s+", " ", p)
+        if p and len(p) > 1:
+            out.append(p)
+    return out[:2]
 
-# ---------- OpenAI: krachtig advies in één tekstwolk ----------
+def _queries_from_combine(bullets, max_links=6):
+    seen, out = set(), []
+    for b in as_list(bullets):
+        for q in _query_from_bullet(b):
+            ql = q.lower()
+            if ql not in seen:
+                out.append(q); seen.add(ql)
+            if len(out) >= max_links:
+                return out
+    return out
+
+# ---------- JSON schema (alleen persoonlijk advies) ----------
 SCHEMA_HINT = {
   "headline": "max 8 woorden samenvatting",
   "personal_advice": {
@@ -248,6 +242,7 @@ SCHEMA_HINT = {
   }
 }
 
+# ---------- OpenAI call ----------
 def get_advice_json(link: str) -> dict:
     # Defaults als sidebar dicht is
     fig = st.session_state.get("pf_l", "Weet ik niet")
@@ -260,7 +255,6 @@ def get_advice_json(link: str) -> dict:
     product_name = _product_name(link)
     keywords     = _keywords_from_url(link)
     domain       = urlparse(link).netloc
-    detected_category = _detect_category(link)
 
     system_msg = (
         "Je bent een modieuze maar praktische personal stylist. Schrijf in helder Nederlands (B1), kort en concreet. "
@@ -270,23 +264,21 @@ def get_advice_json(link: str) -> dict:
     )
 
     user_msg = f"""
-Analyseer dit product uitsluitend op basis van URL-naam/keywords.
+Analyseer dit product uitsluitend op basis van de URL-naam/keywords.
 URL: {link}
 Domein: {domain}
 Vermoedelijke productnaam: {product_name}
 Keywords: {keywords}
-Gedetecteerde categorie: {detected_category}
 Profiel: {profile}
 
 Geef ALLEEN JSON met exact deze velden (geen extra velden):
 {json.dumps(SCHEMA_HINT, ensure_ascii=False)}
 
-Belangrijk:
-- **Daarna persoonlijk advies**: verbind elk punt aan het profiel (lengte/fit/huidskleur/gelegenheid/vibe/maten). Kort en concreet.
-- Combineer-advies: generieke items, afgestemd op gelegenheid en vibe.
-- Colors: stem af op huidskleur; noem twee veilige keuzes.
-- Care/quality: algemene, veilige richtlijnen per categorie (geen verzonnen cijfers of claims).
-- Checks: 2 concrete dingen om op de productpagina te controleren.
+Schrijfregels:
+- Beperk je tot stijl-advies dat je ZEKER kunt geven zonder productdetails te raden.
+- Geen maatadvies, stofclaims, lengteclaims of merkspecifieke aannames.
+- Maak elk punt persoonlijk: koppel aan lengte/figuur/huidskleur/gelegenheid/gevoel.
+- B1 Nederlands, kort en concreet (max 8–10 woorden per bullet), geen emoji of merknamen.
 """
 
     try:
@@ -297,96 +289,50 @@ Belangrijk:
             temperature=0.4, max_tokens=600,
         )
         data = json.loads(resp.choices[0].message.content)
-        # Minimale validatie + fallbacks voor nieuw schema
         data.setdefault("headline", product_name or "Snel advies")
-
-        obs = data.setdefault("item_observation", {})
-        obs.setdefault("what_it_is", detected_category.title())
-        obs.setdefault("traits", [])
 
         pers = data.setdefault("personal_advice", {})
         pers.setdefault("for_you", [])
         pers.setdefault("avoid", [])
-
-        sf = pers.setdefault("size_fit", {})
-        sf.setdefault("size_tip", "Neem je normale maat, controleer maattabel.")
-        sf.setdefault("fit_tips", [])
-
         pers.setdefault("colors", [])
         pers.setdefault("combine", [])
 
-        data.setdefault("care_quality", [])
-        data.setdefault("checks", [])
         return data
     except Exception:
         # Fallback — veilig en neutraal (nieuw schema)
         return {
             "headline": product_name or "Snel advies",
-            "item_observation": {
-                "what_it_is": detected_category.title(),
-                "traits": [
-                    "Tijdloos model, makkelijk te stylen.",
-                    "Categorie-typische pasvormkenmerken.",
-                    "Let op stof en afwerking."
-                ]
-            },
             "personal_advice": {
                 "for_you": [
-                    "Kies lengte passend bij jouw lengte.",
-                    "Stem pasvorm af op fitvoorkeur.",
-                    "Kleurkeuze afstemmen op huidskleur."
+                    "Kies silhouet passend bij jouw lengte",
+                    "Houd lijnen rustig voor casual look",
+                    "Laat kleur aansluiten op jouw vibe"
                 ],
                 "avoid": [
-                    "Vermijd te strak bij comfortwens.",
-                    "Vermijd glans als je het subtiel wilt."
+                    "Vermijd te druk als je minimal wil",
+                    "Vermijd harde contrasten bij zachte vibe"
                 ],
-                "size_fit": {
-                    "size_tip": "Neem je normale maat.",
-                    "fit_tips": ["Lengte tot heup is veilig", "Hou top relaxed-fit"]
-                },
-                "colors": ["Neutraal: wit, grijs, navy", "Accent: olijf of bordeaux"],
-                "combine": ["Rechte jeans of chino", "Witte sneaker of loafer"]
-            },
-            "care_quality": ["Kies katoen 180–220 g/m²", "Was koud, binnenstebuiten"],
-            "checks": ["Samenstelling en waslabel", "Lengte in cm/maattabel"]
+                "colors": [
+                    "Neutraal: ecru, zand, navy",
+                    "Accent: olijf of bordeaux"
+                ],
+                "combine": [
+                    "Rechte jeans of chino",
+                    "Witte sneaker of loafer"
+                ]
+            }
         }
 
-# ---------- Render: één sterke tekstwolk ----------
-
-def verdict_class(v: str) -> str:
-    v = (v or "").strip().lower()
-    if v.startswith("doen"): return "doen"
-    if v.startswith("over"): return "overslaan"
-    return "twijfel"
-
-
+# ---------- Render kaart 1: advies ----------
 def render_single_card(data: dict, link: str):
     product_name = _product_name(link)
     headline = esc(data.get("headline", product_name or "Kort advies"))
 
-    obs = data.get("item_observation", {})
-    what  = esc(obs.get("what_it_is",""))
-    traits = [esc(x) for x in as_list(obs.get("traits"))][:3]
-
     pers = data.get("personal_advice", {})
     for_you = [esc(x) for x in as_list(pers.get("for_you"))][:3]
     avoid   = [esc(x) for x in as_list(pers.get("avoid"))][:2]
-
-    fit_tips = [esc(x) for x in as_list(pers.get("size_fit",{}).get("fit_tips"))][:2]
-    size_tip = esc(pers.get("size_fit",{}).get("size_tip", "Neem je normale maat."))
-    colors   = [esc(x) for x in as_list(pers.get("colors"))][:2]
-    combine  = [esc(x) for x in as_list(pers.get("combine"))][:2]
-
-    care   = [esc(x) for x in as_list(data.get("care_quality"))][:2]
-    checks = [esc(x) for x in as_list(data.get("checks"))][:2]
-
-    # Alternatieven (site- of Google fallback)
-    cheaper_q = f"{product_name} budget"
-    premium_q = f"{product_name} premium"
-    cheaper_url = _build_link_or_fallback(link, cheaper_q)
-    premium_url = _build_link_or_fallback(link, premium_q)
-
-    LINK_SVG2 = "<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'><path d='M3.9 12a5 5 0 015-5h3v2h-3a3 3 0 100 6h3v2h-3a5 5 0 01-5-5zm7-3h3a5 5 0 110 10h-3v-2h3a3 3 0 100-6h-3V9z'/></svg>"
+    colors  = [esc(x) for x in as_list(pers.get("colors"))][:2]
+    combine = [esc(x) for x in as_list(pers.get("combine"))][:2]
 
     html = f"""
 <div class="card">
@@ -412,21 +358,48 @@ def render_single_card(data: dict, link: str):
       {''.join([f"<li>{x}</li>" for x in avoid])}
     </ul>
 
-    <div class="btnrow">
-      <a class="btn" href="{cheaper_url}" target="_blank" rel="nofollow noopener">{LINK_SVG2} Bekijk goedkoper alternatief</a>
-      <a class="btn" href="{premium_url}" target="_blank" rel="nofollow noopener">{LINK_SVG2} Bekijk premium alternatief</a>
-    </div>
-
-    <div class="small-note" style="margin-top:10px;">Advies gebaseerd op productnaam/keywords en jouw profiel (zonder website-scraping). Controleer altijd samenstelling en maattabel.</div>
+    <div class="small-note" style="margin-top:10px;">Advies gebaseerd op productnaam/keywords en jouw profiel (zonder website-scraping). Geen maat- of materiaalclaims.</div>
   </div>
 </div>
 """
+    st.markdown(_html_noindent(html), unsafe_allow_html=True)
 
-    # onderaan in render_single_card(...)
+# ---------- Render kaart 2: bijpassende links ----------
+def render_matching_links_card(data: dict, link: str):
+    pers = data.get("personal_advice", {})
+    combine_raw = as_list(pers.get("combine"))
+    queries = _queries_from_combine(combine_raw, max_links=6)
+
+    if not queries:
+        return
+
+    LINK_SVG2 = "<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'><path d='M3.9 12a5 5 0 015-5h3v2h-3a3 3 0 100 6h3v2h-3a5 5 0 01-5-5zm7-3h3a5 5 0 110 10h-3v-2h3a3 3 0 100-6h-3V9z'/></svg>"
+
+    buttons = []
+    for q in queries:
+        url = _build_link_or_fallback(link, q)
+        label = f'Zoek: {html_escape(q)}'
+        buttons.append(f'<a class="btn" href="{url}" target="_blank" rel="nofollow noopener">{LINK_SVG2} {label}</a>')
+
+    html = f"""
+<div class="card">
+  <div class="card-title">
+    <svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3l1.5 3-2 3 2 11h5l2-11-2-3L16 3h-2l-1 2-1-2H8z" fill="#556BFF"/></svg>
+    Bijpassende kleding
+  </div>
+  <div class="card-body">
+    <div class="btnrow">
+      {''.join(buttons)}
+    </div>
+    <div class="small-note" style="margin-top:10px;">
+      We zoeken eerst binnen deze shop; als dat niet kan, dan via Google.
+    </div>
+  </div>
+</div>
+"""
     st.markdown(_html_noindent(html), unsafe_allow_html=True)
 
 # ---------- UI ----------
-# (optioneel) bookmarklet-tekst zoals in de mock
 st.markdown(dedent("""
 <span class='note-chip'>Bookmarklet: sleep deze AI-stylist naar je bladwijzerbalk en klik op een productpagina.</span>
 """), unsafe_allow_html=True)
@@ -439,7 +412,8 @@ active_link = link_qs if (auto and link_qs) else st.session_state.last_link
 
 if active_link:
     data = get_advice_json(active_link)
-    render_single_card(data, active_link)
+    render_single_card(data, active_link)          # Kaart 1: advies
+    render_matching_links_card(data, active_link)  # Kaart 2: bijpassende links
 
 # Input-veld ONDERAAN in witte card
 with st.form("manual_bottom", clear_on_submit=False):
