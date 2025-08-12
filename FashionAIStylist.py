@@ -282,7 +282,6 @@ Geef ALLEEN JSON met exact deze velden (geen extra velden):
 {json.dumps(SCHEMA_HINT, ensure_ascii=False)}
 
 Belangrijk:
-- **Eerst algemene observatie**: beschrijf wat het is en 3 categorie-typische kenmerken. Gebruik neutrale taal ("meestal", "vaak"). Geen speculatie over merk-specifieke details.
 - **Daarna persoonlijk advies**: verbind elk punt aan het profiel (lengte/fit/huidskleur/gelegenheid/vibe/maten). Kort en concreet.
 - Combineer-advies: generieke items, afgestemd op gelegenheid en vibe.
 - Colors: stem af op huidskleur; noem twee veilige keuzes.
@@ -397,21 +396,9 @@ def render_single_card(data: dict, link: str):
   </div>
   <div class="card-body">
 
-    <div class="section-h">• Algemene observatie</div>
-    <ul>
-      <li><strong>Item:</strong> {what}</li>
-      {''.join([f"<li>{x}</li>" for x in traits])}
-    </ul>
-
     <div class="section-h">• Specifiek advies voor jou</div>
     <ul>
       {''.join([f"<li>{x}</li>" for x in for_you])}
-    </ul>
-
-    <div class="section-h">• Maat & pasvorm</div>
-    <ul>
-      <li><strong>Maat:</strong> {size_tip}</li>
-      {''.join([f"<li>{x}</li>" for x in fit_tips])}
     </ul>
 
     <div class="section-h">• Kleur & combineren</div>
@@ -423,16 +410,6 @@ def render_single_card(data: dict, link: str):
     <div class="section-h">• Liever vermijden</div>
     <ul>
       {''.join([f"<li>{x}</li>" for x in avoid])}
-    </ul>
-
-    <div class="section-h">• Kwaliteit & onderhoud</div>
-    <ul>
-      {''.join([f"<li>{x}</li>" for x in care])}
-    </ul>
-
-    <div class="section-h">• Snel checken op de productpagina</div>
-    <ul>
-      {''.join([f"<li>{x}</li>" for x in checks])}
     </ul>
 
     <div class="btnrow">
