@@ -84,16 +84,27 @@ li{ margin: 6px 0; }
 .btn svg{ width:18px; height:18px; }
 
 /* Inline CTA (geen fixed position) */
-.cta-inline{ display:flex; justify-content:flex-end; margin-top: 8px; }
+.cta-inline{ 
+  display:flex; 
+  justify-content:center;   /* knop centreren onder de kaart */
+  margin-top: 12px; 
+}
 .cta-btn{
   background: linear-gradient(180deg, #8C72FF 0%, #6F5BFF 100%);
-  color:#ffffff; border:none; border-radius: 999px;
-  padding: 12px 18px; font-weight:800;
+  color:#ffffff; border:none; border-radius:999px;
+  padding: 14px 22px; font-weight:800;
   box-shadow: 0 16px 36px rgba(23,0,75,0.40);
-  display:inline-flex; align-items:center; gap:10px; cursor:pointer;
+  display:inline-flex; align-items:center; gap:12px; cursor:pointer;
+  line-height: 1; /* perfecte verticale centrering */
 }
-.cta-btn .icon{ width:18px; height:18px; display:inline-block; }
-.cta-btn .icon svg{ width:18px; height:18px; fill:#fff; }
+.cta-btn .icon{
+  width:28px; height:28px;                     /* groter icoon */
+  display:inline-flex; align-items:center; 
+  justify-content:center;                      /* exact in het midden */
+}
+.cta-btn .icon svg{ 
+  width:22px; height:22px; fill:#fff;          /* schaal van het pictogram zelf */
+}
 
 /* Input-card */
 div[data-testid="stForm"]{
