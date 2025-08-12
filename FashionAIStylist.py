@@ -233,6 +233,10 @@ def _build_link_or_fallback(u: str, query: str):
     found = _shop_searches(u, query, limit=1)
     return found[0] if found else _google_fallback(u, query)
 
+def _html_noindent(s: str) -> str:
+    # verwijder alle leidende spaties per regel → geen codeblokken
+    return "\n".join(line.lstrip() for line in s.splitlines())
+
 # ---------- OpenAI: krachtig advies in één tekstwolk ----------
 SCHEMA_HINT = {
   "headline": "max 10 woorden samenvatting",
@@ -453,8 +457,7 @@ def render_single_card(data: dict, link: str):
 """
 
     # onderaan in render_single_card(...)
-    clean_html = dedent(html).strip("\n")  # of gewoon .strip()
-    st.markdown(clean_html, unsafe_allow_html=True)
+    st.markdown(_html_noindent(html), unsafe_allow_html=True)
 
 # ---------- UI ----------
 # (optioneel) bookmarklet-tekst zoals in de mock
