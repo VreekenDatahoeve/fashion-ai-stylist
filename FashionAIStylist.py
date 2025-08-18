@@ -366,7 +366,6 @@ def render_single_card(data: dict, link: str):
       {''.join([f"<li>{x}</li>" for x in avoid])}
     </ul>
 
-    <div class="small-note" style="margin-top:10px;">Advies gebaseerd op productnaam/keywords en jouw profiel (zonder website-scraping). Geen maat- of materiaalclaims.</div>
   </div>
 </div>
 """
