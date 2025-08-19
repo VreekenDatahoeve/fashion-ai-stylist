@@ -135,22 +135,70 @@ prefs_q = _get("prefs","0") == "1"
 
 # ---------- Sidebar voorkeuren ----------
 if "show_prefs" not in st.session_state:
-    st.session_state.show_prefs = prefs_q
+    st.session_state.show_prefs = (prefs_q or _get("prefs","0") == "1")
 
 if st.session_state.show_prefs:
     with st.sidebar:
         st.markdown("### 👤 Vertel iets over jezelf")
-        lichaamsvorm = st.selectbox("Lichaamsvorm", ["Zandloper","Peer","Rechthoek","Appel","Weet ik niet"], index=4, key="pf_l")
-        huidskleur   = st.selectbox("Huidskleur",   ["Licht","Medium","Donker"], index=1, key="pf_h")
-        lengte       = st.selectbox("Lengte",       ["< 1.60m","1.60 - 1.75m","> 1.75m"], index=1, key="pf_len")
-        gelegenheid  = st.selectbox("Gelegenheid",  ["Werk","Feest","Vrije tijd","Bruiloft","Date"], index=2, key="pf_g")
-        gevoel       = st.selectbox("Gevoel",       ["Zelfverzekerd","Speels","Elegant","Casual","Trendy"], index=3, key="pf_ge")
-        if st.button("Sluiten", use_container_width=True):
-            st.session_state.show_prefs = False
-            st.experimental_set_query_params(**{k:v for k,v in qp.items() if k!="prefs"})
-            st.rerun()
+        lichaamsvorm = st.selectbox("Lichaamsvorm",
+            ["Zandloper","Peer","Rechthoek","Appel","Weet ik niet"],
+            index=["Zandloper","Peer","Rechthoek","Appel","Weet ik niet"].index(PROFILE["pf_l"]),
+            key="pf_l"
+        )
+        huidskleur = st.selectbox("Huidskleur",
+            ["Licht","Medium","Donker"],
+            index=["Licht","Medium","Donker"].index(PROFILE["pf_h"]),
+            key="pf_h"
+        )
+        lengte = st.selectbox("Lengte",
+            ["< 1.60m","1.60 - 1.75m","> 1.75m"],
+            index=["< 1.60m","1.60 - 1.75m","> 1.75m"].index(PROFILE["pf_len"]),
+            key="pf_len"
+        )
+        gelegenheid = st.selectbox("Gelegenheid",
+            ["Werk","Feest","Vrije tijd","Bruiloft","Date"],
+            index=["Werk","Feest","Vrije tijd","Bruiloft","Date"].index(PROFILE["pf_g"]),
+            key="pf_g"
+        )
+        gevoel = st.selectbox("Gevoel",
+            ["Zelfverzekerd","Speels","Elegant","Casual","Trendy"],
+            index=["Zelfverzekerd","Speels","Elegant","Casual","Trendy"].index(PROFILE["pf_ge"]),
+            key="pf_ge"
+        )
+
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("Bewaar als standaard", use_container_width=True):
+                prof = {
+                    "pf_l": st.session_state.pf_l,
+                    "pf_h": st.session_state.pf_h,
+                    "pf_len": st.session_state.pf_len,
+                    "pf_g": st.session_state.pf_g,
+                    "pf_ge": st.session_state.pf_ge,
+                }
+                save_profile_to_params(prof, keep_prefs_open=True)
+                st.success("Profiel opgeslagen als standaard.")
+        with c2:
+            if st.button("Sluiten", use_container_width=True):
+                st.session_state.show_prefs = False
+                save_profile_to_params({
+                    "pf_l": st.session_state.pf_l,
+                    "pf_h": st.session_state.pf_h,
+                    "pf_len": st.session_state.pf_len,
+                    "pf_g": st.session_state.pf_g,
+                    "pf_ge": st.session_state.pf_ge,
+                }, keep_prefs_open=False)
+                st.rerun()
 else:
-    lichaamsvorm = "Weet ik niet"; huidskleur="Medium"; lengte="1.60 - 1.75m"; gelegenheid="Vrije tijd"; gevoel="Casual"
+    # Gebruik profiel uit params als 'gesloten' is
+    lichaamsvorm = PROFILE["pf_l"]; huidskleur = PROFILE["pf_h"]
+    lengte = PROFILE["pf_len"]; gelegenheid = PROFILE["pf_g"]; gevoel = PROFILE["pf_ge"]
+    # ook in session_state zetten (voor de LLM call)
+    st.session_state.pf_l   = lichaamsvorm
+    st.session_state.pf_h   = huidskleur
+    st.session_state.pf_len = lengte
+    st.session_state.pf_g   = gelegenheid
+    st.session_state.pf_ge  = gevoel
 
 # ---------- Icons ----------
 DRESS_SVG = """<svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3l1.5 3-2 3 2 11h5l2-11-2-3L16 3h-2l-1 2-1-2H8z" fill="#556BFF"/></svg>"""
