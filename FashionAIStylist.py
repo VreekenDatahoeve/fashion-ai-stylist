@@ -275,25 +275,15 @@ Schrijfregels:
 
 # ---------- RENDER UI ----------
 def render_compact_header():
-    """Compacte header voor panel-modus, in dezelfde stijl als de advieskaarten."""
-    components.html(f"""
-    <div style="
-        background:#ffffff;
-        border:1px solid #EFEBFF;
-        border-radius:16px;
-        padding:14px 18px;
-        margin:8px 0 14px;
-        box-shadow:0 12px 28px rgba(23,0,75,.12);
-        display:flex;
-        align-items:center;
-        gap:10px;
-    ">
-      <div style="width:22px;height:22px;">{DRESS_SVG}</div>
-      <span style="font-weight:800;font-size:18px;color:#1f2358;letter-spacing:-.01em;">
+    """Compacte header in exact dezelfde stijl als de advies- en matchingcards."""
+    st.markdown(f"""
+    <div class="card">
+      <div class="card-title">
+        {DRESS_SVG}
         Fashion AI Stylist
-      </span>
+      </div>
     </div>
-    """, height=60)
+    """, unsafe_allow_html=True)
 
 def render_single_card(data: dict, link: str):
     headline = esc(data.get("headline","Advies"))
