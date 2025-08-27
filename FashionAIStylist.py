@@ -1,4 +1,4 @@
-# app.py — Fashion AI Stylist (mockup-accurate UI)
+# app.py — Fashion AI Stylist (mockup-accurate UI, hero 100% HTML)
 import os, re, json
 import streamlit as st
 from urllib.parse import urlparse, quote
@@ -7,7 +7,7 @@ from textwrap import dedent
 from openai import OpenAI
 
 # ========= Instellingen =========
-APP_URL = "https://fashion-ai-stylis-ifidobqmkgjtn7gjxgrudb.streamlit.app"  # <-- jouw publieke URL
+APP_URL = "https://fashion-ai-stylis-ifidobqmkgjtn7gjxgrudb.streamlit.app"  # <-- vervang met jouw URL
 MODEL   = "gpt-4o-mini"
 # =================================
 
@@ -19,7 +19,10 @@ if not API_KEY:
 client = OpenAI(api_key=API_KEY)
 
 # ---------- Profiel (query params) ----------
-DEFAULT_PROFILE = {"pf_l":"Weet ik niet","pf_h":"Medium","pf_len":"1.60 - 1.75m","pf_g":"Vrije tijd","pf_ge":"Casual"}
+DEFAULT_PROFILE = {
+    "pf_l":"Weet ik niet", "pf_h":"Medium", "pf_len":"1.60 - 1.75m",
+    "pf_g":"Vrije tijd", "pf_ge":"Casual"
+}
 
 def get_params_profile():
     qp = st.query_params
@@ -31,8 +34,7 @@ def get_params_profile():
 
 def save_profile_to_params(p: dict, keep_prefs_open: bool = True):
     u = st.query_params
-    for k, v in p.items():
-        u[k] = v
+    for k, v in p.items(): u[k] = v
     u["prefs"] = "1" if keep_prefs_open else "0"
     st.query_params = u
 
@@ -86,13 +88,11 @@ footer { visibility:hidden; }
   box-shadow: 0 16px 40px rgba(23,0,75,0.18); padding: 22px; margin-top: 8px;
 }
 .hero-title{
-  font-size: 34px; font-weight: 800; color:#1f2358; margin: 0 0 14px;
-  letter-spacing:-.02em;
+  font-size: 34px; font-weight: 800; color:#1f2358; margin: 0 0 14px; letter-spacing:-.02em;
 }
 .hero-row{ display:flex; gap:12px; align-items:center; }
 .hero-input{
-  flex:1;
-  background:#fff; border:1px solid #E3E6FF; border-radius:14px;
+  flex:1; background:#fff; border:1px solid #E3E6FF; border-radius:14px;
   height:52px; padding: 0 14px; font-size:16px; outline:none;
 }
 .hero-input:focus{ border-color:#8C72FF; box-shadow: 0 0 0 3px rgba(140,114,255,.20); }
@@ -112,7 +112,7 @@ footer { visibility:hidden; }
   box-shadow: 0 10px 24px rgba(40,12,120,0.15); backdrop-filter: blur(4px);
 }
 
-/* ===== Generic cards (advies / links) ===== */
+/* ===== Cards (advies / links) ===== */
 .card{
   background:#ffffff; border-radius: 22px; padding: 22px;
   box-shadow: 0 16px 40px rgba(23,0,75,0.18);
@@ -189,7 +189,6 @@ if st.session_state.show_prefs:
                 save_profile_to_params(prof, keep_prefs_open=False)
                 st.rerun()
 else:
-    # Gebruik profiel uit params
     for k,v in PROFILE.items():
         st.session_state[k] = v
 
@@ -406,6 +405,10 @@ def render_single_card(data: dict, link: str):
     st.markdown(_html_noindent(html), unsafe_allow_html=True)
 
 # ---------- Render kaart 2: bijpassende links + inline CTA ----------
+def _build_link_or_fallback(u: str, query: str):
+    found = _shop_searches(u, query, limit=1)
+    return found[0] if found else _google_fallback(u, query)
+
 def render_matching_links_card(data: dict, link: str):
     pers = data.get("personal_advice", {})
     combine_raw = as_list(pers.get("combine"))
@@ -422,7 +425,6 @@ def render_matching_links_card(data: dict, link: str):
         return
 
     LINK_SVG2 = "<svg viewBox='0 0 24 24'><path d='M3.9 12a5 5 0 015-5h3v2h-3a3 3 0 100 6h3v2h-3a5 5 0 01-5-5zm7-3h3a5 5 0 110 10h-3v-2h3a3 3 0 100-6h-3V9z'/></svg>"
-
     buttons = []
     for q in queries:
         url = _build_link_or_fallback(link, q)
@@ -450,6 +452,8 @@ def render_matching_links_card(data: dict, link: str):
     st.markdown(_html_noindent(html), unsafe_allow_html=True)
 
 # ======================= UI FLOW =======================
+def render_header(): ...
+# (header is al boven gedefinieerd; Python laat dubbele definities toe maar we houden er één)
 
 render_header()
 
@@ -457,16 +461,12 @@ render_header()
 if "last_link" not in st.session_state:
     st.session_state.last_link = ""
 
-# Hero (bovenaan)
+# Hero
 prefill = link_qs if (auto and link_qs) else st.session_state.last_link
 render_hero(link_prefill=prefill)
 
-# Actieve link bepalen (na hero-redirect komt hij via query param binnen)
+# Actieve link bepalen (na knop → herlaadt met ?auto=1&u=...)
 active_link = link_qs if (auto and link_qs) else st.session_state.last_link
-
-# Als user al eerder iets heeft ingevoerd via oude flow, behoud
-if not active_link and st.session_state.last_link:
-    active_link = st.session_state.last_link
 
 # Render advies
 if active_link:
