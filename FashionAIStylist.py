@@ -1,4 +1,4 @@
-# app.py — Fashion AI Stylist (hero component + matching chips + regex fix + caching)
+# app.py — Fashion AI Stylist (panel mode + hero component + chips + regex-fix + caching)
 import os, re, json
 import streamlit as st
 import streamlit.components.v1 as components
@@ -8,7 +8,7 @@ from textwrap import dedent
 from openai import OpenAI
 
 # ========= Instellingen =========
-APP_URL = "https://fashion-ai-stylis-ifidobqmkgjtn7gjxgrudb.streamlit.app"  # <-- vervang met jouw URL
+APP_URL = "https://fashion-ai-stylis-ifidobqmkgjtn7gjxgrudb.streamlit.app"  # <-- zet hier jouw publieke app-URL
 MODEL   = "gpt-4o-mini"
 # =================================
 
@@ -22,89 +22,108 @@ client = OpenAI(api_key=API_KEY)
 # ---------- Profiel (query params) ----------
 DEFAULT_PROFILE = {"pf_l":"Weet ik niet","pf_h":"Medium","pf_len":"1.60 - 1.75m","pf_g":"Vrije tijd","pf_ge":"Casual"}
 
-def get_params_profile():
+def _qp_get(name: str, default=""):
     qp = st.query_params
+    v = qp.get(name, default)
+    return (v[0] if isinstance(v, list) and v else v) or default
+
+def get_params_profile():
     out = DEFAULT_PROFILE.copy()
     for k in DEFAULT_PROFILE.keys():
-        v = qp.get(k, out[k])
-        out[k] = (v[0] if isinstance(v, list) and v else v) or out[k]
+        out[k] = _qp_get(k, out[k])
     return out
 
 def save_profile_to_params(p: dict, keep_prefs_open: bool = True):
     u = st.query_params
-    for k, v in p.items():
-        u[k] = v
+    for k, v in p.items(): u[k] = v
     u["prefs"] = "1" if keep_prefs_open else "0"
     st.query_params = u
 
 PROFILE = get_params_profile()
 
+# ---------- Flags / Query ----------
+LINK_QS = _qp_get("u").strip()
+AUTO    = str(_qp_get("auto","0")) == "1"
+PREFS_Q = _qp_get("prefs","0") == "1"
+PANEL   = (_qp_get("panel","0") == "1") or (_qp_get("embed","0") == "1")  # compacte modus
+
 # ---------- Pagina ----------
-st.set_page_config(page_title="Fashion AI Stylist", page_icon="👗", layout="centered", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Fashion AI Stylist", page_icon="👗", layout="centered",
+                   initial_sidebar_state="collapsed")
 
 # ---------- CSS ----------
-st.markdown(dedent("""
+st.markdown(dedent(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
 
-html, body, [data-testid="stAppViewContainer"]{ height:100%; }
-html, body, [class*="stApp"]{ font-family:"Inter", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-[data-testid="stHeader"]{ display:none; } footer { visibility:hidden; }
+html, body, [data-testid="stAppViewContainer"]{{ height:100%; }}
+html, body, [class*="stApp"]{{ font-family:"Inter", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }}
+[data-testid="stHeader"]{{ display:none; }} footer {{ visibility:hidden; }}
 
-[data-testid="stAppViewContainer"]{
+[data-testid="stAppViewContainer"]{{
   background: radial-gradient(1200px 600px at 50% -120px, #C8B9FF 0%, #AA98FF 30%, #8F7DFF 60%, #7A66F7 100%);
-}
-.block-container{ max-width: 860px; padding-top: 12px !important; padding-bottom: 90px !important; }
+}}
+.block-container{{
+  max-width: 860px;
+  padding-top: {8 if PANEL else 12}px !important;
+  padding-bottom: {40 if PANEL else 90}px !important;
+}}
 
 /* ===== Cards ===== */
-.card{ background:#fff; border-radius:22px; padding:22px; box-shadow:0 16px 40px rgba(23,0,75,0.18); border:1px solid #EFEBFF; margin-top:16px; }
-.card-title{ font-size:26px; font-weight:800; color:#1f2358; margin:0 0 12px; display:flex; gap:12px; align-items:center; letter-spacing:-.01em; }
-.card-sub{ color:#2b2b46; }
-.section-h{ font-weight:800; margin:14px 0 6px; color:#1f2358; }
-ul{ margin:0 0 0 1.15rem; padding:0; line-height:1.6; } li{ margin:6px 0; }
+.card{{
+  background:#fff; border-radius:22px; padding:{16 if PANEL else 22}px;
+  box-shadow:0 16px 40px rgba(23,0,75,0.18); border:1px solid #EFEBFF; margin-top:{12 if PANEL else 16}px;
+}}
+.card-title{{
+  font-size:{22 if PANEL else 26}px; font-weight:800; color:#1f2358; margin:0 0 10px;
+  display:flex; gap:10px; align-items:center; letter-spacing:-.01em;
+}}
+.card-sub{{ color:#2b2b46; font-size:{14 if PANEL else 16}px; }}
+.section-h{{ font-weight:800; margin:{10 if PANEL else 14}px 0 6px; color:#1f2358; }}
+ul{{ margin:0 0 0 1.15rem; padding:0; line-height:1.6; }} li{{ margin:6px 0; }}
 
 /* Chips */
-.matching .btnrow{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
-.matching .chip{ display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px;
-  background:#F3F4FF; border:1px solid #E3E6FF; text-decoration:none; font-weight:700; color:#1f2a5a;
-  box-shadow:0 4px 14px rgba(23,0,75,0.12); transition:transform .04s ease; }
-.matching .chip:hover{ transform: translateY(-1px); }
-.matching .chip svg{ width:18px; height:18px; }
-.matching .note{ color:#6B7280; font-size:13px; margin-top:10px; }
+.matching .btnrow{{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }}
+.matching .chip{{
+  display:inline-flex; align-items:center; gap:8px; padding:{8 if PANEL else 10}px {12 if PANEL else 14}px;
+  border-radius:12px; background:#F3F4FF; border:1px solid #E3E6FF; text-decoration:none;
+  font-weight:700; color:#1f2a5a; box-shadow:0 4px 14px rgba(23,0,75,0.12); transition:transform .04s ease;
+  font-size:{13 if PANEL else 14}px;
+}}
+.matching .chip:hover{{ transform: translateY(-1px); }}
+.matching .chip svg{{ width:{16 if PANEL else 18}px; height:{16 if PANEL else 18}px; }}
+.matching .note{{ color:#6B7280; font-size:{12 if PANEL else 13}px; margin-top:10px; }}
 
-/* CTA */
-.cta-inline{ display:flex; justify-content:center; margin-top:16px; }
-.cta-btn{ background:linear-gradient(180deg,#8C72FF 0%,#6F5BFF 100%); color:#fff; border:none; border-radius:999px;
-  padding:14px 22px; font-weight:800; box-shadow:0 16px 36px rgba(23,0,75,0.40); display:inline-flex; align-items:center; gap:12px; cursor:pointer; line-height:1; }
+/* CTA (nu niet gebruikt in panel, maar laten staan) */
+.cta-inline{{ display:flex; justify-content:center; margin-top: 16px; }}
+.cta-btn{{
+  background:linear-gradient(180deg,#8C72FF 0%,#6F5BFF 100%); color:#fff; border:none; border-radius:999px;
+  padding:14px 22px; font-weight:800; box-shadow:0 16px 36px rgba(23,0,75,0.40); display:inline-flex;
+  align-items:center; gap:12px; cursor:pointer; line-height:1;
+}}
 </style>
 """), unsafe_allow_html=True)
 
-# ---------- Query params ----------
-qp = st.query_params
-def _get(name, default=""):
-    v = qp.get(name, default)
-    return (v[0] if isinstance(v, list) and v else v) or default
-
-link_qs = _get("u").strip()
-auto    = str(_get("auto","0")) == "1"
-prefs_q = _get("prefs","0") == "1"
-
 # ---------- Sidebar voorkeuren ----------
 if "show_prefs" not in st.session_state:
-    st.session_state.show_prefs = (prefs_q or _get("prefs","0") == "1")
+    st.session_state.show_prefs = (PREFS_Q or _qp_get("prefs","0") == "1")
 
-if st.session_state.show_prefs:
+if st.session_state.show_prefs and not PANEL:
     with st.sidebar:
         st.markdown("### 👤 Vertel iets over jezelf")
-        st.selectbox("Lichaamsvorm", ["Zandloper","Peer","Rechthoek","Appel","Weet ik niet"], index=["Zandloper","Peer","Rechthoek","Appel","Weet ik niet"].index(PROFILE["pf_l"]), key="pf_l")
-        st.selectbox("Huidskleur", ["Licht","Medium","Donker"], index=["Licht","Medium","Donker"].index(PROFILE["pf_h"]), key="pf_h")
-        st.selectbox("Lengte", ["< 1.60m","1.60 - 1.75m","> 1.75m"], index=["< 1.60m","1.60 - 1.75m","> 1.75m"].index(PROFILE["pf_len"]), key="pf_len")
-        st.selectbox("Gelegenheid", ["Werk","Feest","Vrije tijd","Bruiloft","Date"], index=["Werk","Feest","Vrije tijd","Bruiloft","Date"].index(PROFILE["pf_g"]), key="pf_g")
-        st.selectbox("Gevoel", ["Zelfverzekerd","Speels","Elegant","Casual","Trendy"], index=["Zelfverzekerd","Speels","Elegant","Casual","Trendy"].index(PROFILE["pf_ge"]), key="pf_ge")
+        st.selectbox("Lichaamsvorm", ["Zandloper","Peer","Rechthoek","Appel","Weet ik niet"],
+                     index=["Zandloper","Peer","Rechthoek","Appel","Weet ik niet"].index(PROFILE["pf_l"]), key="pf_l")
+        st.selectbox("Huidskleur", ["Licht","Medium","Donker"],
+                     index=["Licht","Medium","Donker"].index(PROFILE["pf_h"]), key="pf_h")
+        st.selectbox("Lengte", ["< 1.60m","1.60 - 1.75m","> 1.75m"],
+                     index=["< 1.60m","1.60 - 1.75m","> 1.75m"].index(PROFILE["pf_len"]), key="pf_len")
+        st.selectbox("Gelegenheid", ["Werk","Feest","Vrije tijd","Bruiloft","Date"],
+                     index=["Werk","Feest","Vrije tijd","Bruiloft","Date"].index(PROFILE["pf_g"]), key="pf_g")
+        st.selectbox("Gevoel", ["Zelfverzekerd","Speels","Elegant","Casual","Trendy"],
+                     index=["Zelfverzekerd","Speels","Elegant","Casual","Trendy"].index(PROFILE["pf_ge"]), key="pf_ge")
 
 # ---------- Icons ----------
 DRESS_SVG = """<svg viewBox="0 0 24 24" fill="#556BFF" width="22" height="22"><path d="M8 3l1.5 3-2 3 2 11h5l2-11-2-3L16 3h-2l-1 2-1-2H8z"/></svg>"""
-CHAT_SVG = """<span class="icon"><svg viewBox="0 0 24 24"><path d="M4 12c0-4.4 3.6-8 8-8s8 3.6 8 8-3.6 8-8 8H9l-4 3v-3.5C4.7 18.3 4 15.3 4 12z" fill="white" opacity="0.9"/></svg></span>"""
 
 # ---------- Helpers ----------
 def esc(x) -> str: return html_escape("" if x is None else str(x))
@@ -145,10 +164,11 @@ def _build_link_or_fallback(u: str, query: str):
     found = _shop_searches(u, query, limit=1)
     return found[0] if found else _google_fallback(u, query)
 
-# ✅ regex-fix: normaliseer stukjes zoekterm
+# ✅ Regex-fix
 def _normalize_query_piece(p: str) -> str:
-    if not isinstance(p, str): p = str(p or "")
-    p = re.sub(r"[^\w\s-]+", "", p, flags=re.UNICODE)  # alleen letters/cijfers/underscore/spaties/-
+    if not isinstance(p, str):
+        p = str(p or "")
+    p = re.sub(r"[^\w\s-]+", "", p, flags=re.UNICODE)   # alleen letters/cijfers/underscore/spaties/-
     p = re.sub(r"\s+", " ", p).strip()
     return p
 
@@ -175,19 +195,18 @@ def _queries_from_combine(bullets, max_links=4):
                 return out
     return out
 
-# ---------- LLM call + caching ----------
+# ---------- Caching voor AI ----------
 def _profile_cache_key() -> str:
     return "|".join([
-        st.session_state.get("pf_l", DEFAULT_PROFILE["pf_l"]),
-        st.session_state.get("pf_h", DEFAULT_PROFILE["pf_h"]),
-        st.session_state.get("pf_len", DEFAULT_PROFILE["pf_len"]),
-        st.session_state.get("pf_g", DEFAULT_PROFILE["pf_g"]),
-        st.session_state.get("pf_ge", DEFAULT_PROFILE["pf_ge"]),
+        st.session_state.get("pf_l", PROFILE["pf_l"]),
+        st.session_state.get("pf_h", PROFILE["pf_h"]),
+        st.session_state.get("pf_len", PROFILE["pf_len"]),
+        st.session_state.get("pf_g", PROFILE["pf_g"]),
+        st.session_state.get("pf_ge", PROFILE["pf_ge"]),
     ])
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def cached_advice(link: str, profile_key: str) -> dict:
-    """Cache AI-advies per (link + profiel) 1 uur."""
     product_name = _product_name(link)
     try:
         resp = client.chat.completions.create(
@@ -195,12 +214,13 @@ def cached_advice(link: str, profile_key: str) -> dict:
             response_format={"type":"json_object"},
             messages=[
                 {"role":"system","content":"Je bent een stylist. Schrijf kort en concreet in B1-Nederlands."},
-                {"role":"user","content":f"URL: {link}\nProfiel-key: {profile_key}\nGeef JSON met velden: headline, personal_advice{{for_you(3),avoid(2),colors(2),combine(2)}}"}
+                {"role":"user","content":f"URL: {link}\nProfiel-key: {profile_key}\nGeef JSON met: headline, personal_advice{{for_you(3),avoid(2),colors(2),combine(2)}}"}
             ],
             temperature=0.4, max_tokens=600,
         )
         data = json.loads(resp.choices[0].message.content)
         data.setdefault("headline", product_name or "Snel advies")
+        data.setdefault("personal_advice", {})
         return data
     except Exception:
         return {
@@ -215,6 +235,8 @@ def cached_advice(link: str, profile_key: str) -> dict:
 
 # ---------- HEADER ----------
 def render_header():
+    if PANEL:  # geen grote header in panel
+        return
     components.html("""
     <div style="display:flex;align-items:center;gap:14px;margin:10px 0 8px;color:#fff;">
       <svg width="40" height="40" viewBox="0 0 24 24" fill="#fff" xmlns="http://www.w3.org/2000/svg"><path d="M8 3l1.5 3-2 3 2 11h5l2-11-2-3L16 3h-2l-1 2-1-2H8z"/></svg>
@@ -224,15 +246,17 @@ def render_header():
 
 # ---------- HERO ----------
 def render_hero(link_prefill: str = ""):
+    hero_title_size = 24 if PANEL else 34
+    hero_height     = 120 if PANEL else 140
     components.html(f"""
 <!doctype html><html><head><meta charset="utf-8"/>
 <style>
   body{{margin:0;font-family:Inter,system-ui}}
-  .hero{{background:#fff;border:1px solid #EFEBFF;border-radius:22px;box-shadow:0 16px 40px rgba(23,0,75,.18);padding:22px;margin-top:8px;}}
-  .hero-title{{font:800 34px/1.2 Inter,system-ui;color:#1f2358;letter-spacing:-.02em;margin:0 0 14px}}
+  .hero{{background:#fff;border:1px solid #EFEBFF;border-radius:22px;box-shadow:0 16px 40px rgba(23,0,75,.18);padding:{14 if PANEL else 22}px;margin-top:8px;}}
+  .hero-title{{font:800 {hero_title_size}px/1.2 Inter,system-ui;color:#1f2358;letter-spacing:-.02em;margin:0 0 {10 if PANEL else 14}px}}
   .row{{display:flex;gap:12px;align-items:center}}
-  .inp{{flex:1;background:#fff;border:1px solid #E3E6FF;border-radius:14px;height:52px;padding:0 14px;font:500 16px Inter,system-ui;outline:none}}
-  .btn{{border:0;border-radius:14px;padding:14px 20px;font:800 16px Inter,system-ui;cursor:pointer;color:#fff;background:linear-gradient(180deg,#8C72FF 0%,#6F5BFF 100%);box-shadow:0 12px 28px rgba(23,0,75,.35)}}
+  .inp{{flex:1;background:#fff;border:1px solid #E3E6FF;border-radius:14px;height:{44 if PANEL else 52}px;padding:0 14px;font:{500} {14 if PANEL else 16}px Inter,system-ui;outline:none}}
+  .btn{{border:0;border-radius:14px;padding:{10 if PANEL else 14}px {16 if PANEL else 20}px;font:800 {14 if PANEL else 16}px Inter,system-ui;cursor:pointer;color:#fff;background:linear-gradient(180deg,#8C72FF 0%,#6F5BFF 100%);box-shadow:0 12px 28px rgba(23,0,75,.35)}}
 </style>
 <div class="hero">
   <div class="hero-title">Plak een productlink en krijg direct stijl-advies</div>
@@ -242,16 +266,16 @@ def render_hero(link_prefill: str = ""):
       const v=document.getElementById('hero-url').value.trim();
       if(v && /^https?:\\/\\//i.test(v)){{
         const u=new URL(window.parent.location.href);
-        u.searchParams.set('auto','1'); u.searchParams.set('u',v);
+        u.searchParams.set('auto','1'); u.searchParams.set('u',v); u.searchParams.set('panel','{1 if PANEL else 0}');
         window.parent.location=u.toString();
       }} else {{ alert('Plak eerst een geldige URL'); }}
     ">Advies ophalen</button>
   </div>
 </div>
 </html>
-""", height=140, scrolling=False)
+""", height=hero_height, scrolling=False)
 
-# ---------- RENDER ADVIES ----------
+# ---------- ADVIES-KAART ----------
 def render_single_card(data: dict, link: str):
     headline = esc(data.get("headline","Advies"))
     pers = data.get("personal_advice", {})
@@ -273,15 +297,15 @@ def render_single_card(data: dict, link: str):
 </div>
 """, unsafe_allow_html=True)
 
-# ---------- RENDER MATCHING LINKS ----------
+# ---------- MATCHING-LINKS-KAART ----------
 def render_matching_links_card(data: dict, link: str):
     pers = data.get("personal_advice", {})
     queries = _queries_from_combine(as_list(pers.get("combine")), max_links=4)
 
     LINK_SVG = """<svg viewBox="0 0 24 24"><path d="M10 14l-1 1a4 4 0 105.7 5.7l2.6-2.6a4 4 0 00-5.7-5.7l-.6.6" stroke="#6F5BFF" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M14 10l1-1a4 4 0 10-5.7-5.7L6.7 5.9a4 4 0 105.7 5.7l.6-.6" stroke="#6F5BFF" stroke-width="2" stroke-linecap="round" fill="none"/></svg>"""
 
-    if not queries:  # geen suggesties → niets tonen (of je kunt hier CTA plaatsen)
-        return
+    if not queries:
+        return  # niets te tonen
 
     chips_html = []
     for q in queries:
@@ -300,24 +324,22 @@ def render_matching_links_card(data: dict, link: str):
 
 # ======================= MAIN FLOW =======================
 
-# 1) Header
 render_header()
 
-# 2) State init
+# state init
 if "last_link" not in st.session_state:
     st.session_state.last_link = ""
 
-# 3) Hero (prefill = laatst gebruikte of uit query)
-prefill = link_qs if (auto and link_qs) else st.session_state.last_link
+# hero (prefill)
+prefill = LINK_QS if (AUTO and LINK_QS) else st.session_state.last_link
 render_hero(link_prefill=prefill)
 
-# 4) Actieve link bepalen (na klik in hero komt hij via ?auto=1&u=...)
-active_link = link_qs if (auto and link_qs) else st.session_state.last_link
+# actieve link bepalen
+active_link = LINK_QS if (AUTO and LINK_QS) else st.session_state.last_link
 
-# 5) Render advies + matching chips (met caching om traagheid te voorkomen)
+# render advies
 if active_link:
     st.session_state.last_link = active_link
-    profile_key = _profile_cache_key()
-    data = cached_advice(active_link, profile_key)
+    data = cached_advice(active_link, _profile_cache_key())
     render_single_card(data, active_link)
     render_matching_links_card(data, active_link)
