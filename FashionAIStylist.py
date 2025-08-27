@@ -1,4 +1,4 @@
-# app.py — Fashion AI Stylist (hero als component + matching chips)
+# app.py — Fashion AI Stylist (hero component + matching chips + regex fix)
 import os, re, json
 import streamlit as st
 import streamlit.components.v1 as components
@@ -85,27 +85,7 @@ footer { visibility:hidden; }
 ul{ margin: 0 0 0 1.15rem; padding:0; line-height:1.6; }
 li{ margin: 6px 0; }
 
-/* Buttons baseline (kan elders gebruikt worden) */
-.btnrow{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
-.btn{
-  display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px;
-  background:#F3F4FF; color:#2d2a6c; border:1px solid #E3E6FF; text-decoration:none; font-weight:700;
-}
-
-/* Inline CTA */
-.cta-inline{ display:flex; justify-content:center; margin-top: 16px; }
-.cta-btn{
-  background: linear-gradient(180deg, #8C72FF 0%, #6F5BFF 100%);
-  color:#ffffff; border:none; border-radius:999px; padding: 14px 22px; font-weight:800;
-  box-shadow: 0 16px 36px rgba(23,0,75,0.40);
-  display:inline-flex; align-items:center; gap:12px; cursor:pointer; line-height:1;
-}
-.cta-btn .icon svg{ width:22px; height:22px; fill:#fff; }
-.small-note{ color:#6B7280; font-size: 13px; }
-
-.title-icon{ width:22px; height:22px; }
-
-/* --- Matching links: compacte chips (visueel identiek aan referentie) --- */
+/* Chips voor matching links */
 .matching .btnrow{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
 .matching .chip{
   display:inline-flex; align-items:center; gap:8px;
@@ -118,6 +98,15 @@ li{ margin: 6px 0; }
 .matching .chip:hover{ transform: translateY(-1px); }
 .matching .chip svg{ width:18px; height:18px; }
 .matching .note{ color:#6B7280; font-size:13px; margin-top:10px; }
+
+/* CTA */
+.cta-inline{ display:flex; justify-content:center; margin-top: 16px; }
+.cta-btn{
+  background: linear-gradient(180deg, #8C72FF 0%, #6F5BFF 100%);
+  color:#ffffff; border:none; border-radius:999px; padding: 14px 22px; font-weight:800;
+  box-shadow: 0 16px 36px rgba(23,0,75,0.40);
+  display:inline-flex; align-items:center; gap:12px; cursor:pointer; line-height:1;
+}
 </style>
 """), unsafe_allow_html=True)
 
@@ -149,29 +138,13 @@ if st.session_state.show_prefs:
         st.selectbox("Gevoel", ["Zelfverzekerd","Speels","Elegant","Casual","Trendy"],
                      index=["Zelfverzekerd","Speels","Elegant","Casual","Trendy"].index(PROFILE["pf_ge"]), key="pf_ge")
 
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("Bewaar als standaard", use_container_width=True):
-                prof = {k: st.session_state[k] for k in ["pf_l","pf_h","pf_len","pf_g","pf_ge"]}
-                save_profile_to_params(prof, keep_prefs_open=True)
-                st.success("Profiel opgeslagen als standaard.")
-        with c2:
-            if st.button("Sluiten", use_container_width=True):
-                st.session_state.show_prefs = False
-                prof = {k: st.session_state[k] for k in ["pf_l","pf_h","pf_len","pf_g","pf_ge"]}
-                save_profile_to_params(prof, keep_prefs_open=False)
-                st.rerun()
-else:
-    for k,v in PROFILE.items(): st.session_state[k] = v
-
 # ---------- Icons ----------
-DRESS_SVG = """<svg class="title-icon" viewBox="0 0 24 24" fill="#556BFF"><path d="M8 3l1.5 3-2 3 2 11h5l2-11-2-3L16 3h-2l-1 2-1-2H8z"/></svg>"""
+DRESS_SVG = """<svg viewBox="0 0 24 24" fill="#556BFF" width="22" height="22"><path d="M8 3l1.5 3-2 3 2 11h5l2-11-2-3L16 3h-2l-1 2-1-2H8z"/></svg>"""
 CHAT_SVG = """<span class="icon"><svg viewBox="0 0 24 24"><path d="M4 12c0-4.4 3.6-8 8-8s8 3.6 8 8-3.6 8-8 8H9l-4 3v-3.5C4.7 18.3 4 15.3 4 12z" fill="white" opacity="0.9"/></svg></span>"""
 
 # ---------- Helpers ----------
 def esc(x) -> str: return html_escape("" if x is None else str(x))
 def as_list(v): return v if isinstance(v, list) else ([] if v is None else [v])
-def _html_noindent(s: str) -> str: return "\n".join(line.lstrip() for line in s.splitlines())
 
 def _keywords_from_url(u: str):
     try:
@@ -192,8 +165,7 @@ def _host(u: str) -> str:
 def _shop_searches(u: str, query: str, limit=1):
     host = _host(u); q = quote(query)
     patterns = [f"/search?q={q}", f"/zoeken?query={q}", f"/s?searchTerm={q}",
-                f"/search?text={q}", f"/catalogsearch/result/?q={q}",
-                f"/nl/search?q={q}", f"/zoeken?q={q}"]
+                f"/search?text={q}", f"/catalogsearch/result/?q={q}"]
     seen, out = set(), []
     for path in patterns:
         full = host + path
@@ -210,25 +182,23 @@ def _build_link_or_fallback(u: str, query: str):
     found = _shop_searches(u, query, limit=1)
     return found[0] if found else _google_fallback(u, query)
 
-_STOPWORDS_RE = re.compile(
-    r"\b(?:combineer met|draag|voor|met|op|onder|bij|een|de|het|je|jouw|casual|look|outfit|relaxte?|ontspannen|vibe)\b",
-    re.IGNORECASE,
-)
-_SEP_RE = re.compile(r"\b(?:of|en|,|/|\+|&)\b", re.IGNORECASE)
-
+# ✅ FIXED regex
 def _normalize_query_piece(p: str) -> str:
-    p = re.sub(r"[^0-9A-Za-zÀ-ÿ\\- ]+", "", p)
+    if not isinstance(p, str):
+        p = str(p or "")
+    p = re.sub(r"[^\w\s-]+", "", p, flags=re.UNICODE)
     p = re.sub(r"\s+", " ", p).strip()
     return p
 
+_SEP_RE = re.compile(r"\b(?:of|en|,|/|\+|&)\b", re.IGNORECASE)
+
 def _query_from_bullet(text: str):
     s = str(text or "")
-    s = _STOPWORDS_RE.sub(" ", s)
     parts = _SEP_RE.split(s)
     out = []
     for p in parts:
         p = _normalize_query_piece(p)
-        if len(p) >= 3 and p.lower() not in {"kleur", "kleuren", "top", "bovenstuk"}:
+        if len(p) >= 3:
             out.append(p)
     return out[:2]
 
@@ -243,113 +213,52 @@ def _queries_from_combine(bullets, max_links=4):
                 return out
     return out
 
-# ---------- LLM schema ----------
-SCHEMA_HINT = {
-  "headline": "max 8 woorden samenvatting",
-  "personal_advice": {
-    "for_you": ["exact 3 bullets met persoonlijk advies op basis van profiel"],
-    "avoid":   ["exact 2 bullets met wat te vermijden voor dit profiel"],
-    "colors":  ["exact 2 bullets met passende kleuren t.o.v. huidskleur"],
-    "combine": ["exact 2 bullets met combinaties (generieke items), afgestemd op gelegenheid/vibe"]
-  }
-}
-
-# ---------- OpenAI call ----------
+# ---------- LLM call (vereenvoudigd fallback) ----------
 def get_advice_json(link: str) -> dict:
-    fig = st.session_state.get("pf_l", "Weet ik niet")
-    skin = st.session_state.get("pf_h", "Medium")
-    hgt  = st.session_state.get("pf_len", "1.60 - 1.75m")
-    occ  = st.session_state.get("pf_g", "Vrije tijd")
-    vibe = st.session_state.get("pf_ge", "Casual")
-
-    profile = f"figuur={fig}, huidskleur={skin}, lengte={hgt}, gelegenheid={occ}, stijlgevoel={vibe}"
     product_name = _product_name(link)
-    keywords     = _keywords_from_url(link)
-    domain       = urlparse(link).netloc
-
-    system_msg = (
-        "Je bent een modieuze maar praktische personal stylist. Schrijf in helder Nederlands (B1), kort en concreet. "
-        "Gebruik het profiel expliciet: noem lengte/pasvorm/kleuren/gelegenheid waar relevant. "
-        "Wees eerlijk over onzekerheid: speculeer niet over details die je niet weet. "
-        "Geen merknamen of emoji."
-    )
-
-    user_msg = f"""
-Analyseer dit product uitsluitend op basis van de URL-naam/keywords.
-URL: {link}
-Domein: {domain}
-Vermoedelijke productnaam: {product_name}
-Keywords: {keywords}
-Profiel: {profile}
-
-Geef ALLEEN JSON met exact deze velden (geen extra velden):
-{json.dumps(SCHEMA_HINT, ensure_ascii=False)}
-
-Schrijfregels:
-- Beperk je tot stijl-advies dat je ZEKER kunt geven zonder productdetails te raden.
-- Geen maatadvies, stofclaims, lengteclaims of merkspecifieke aannames.
-- Maak elk punt persoonlijk: koppel aan lengte/figuur/huidskleur/gelegenheid/gevoel.
-- B1 Nederlands, kort en concreet (max 8–10 woorden per bullet), geen emoji of merknamen.
-"""
-
     try:
         resp = client.chat.completions.create(
             model=MODEL,
             response_format={"type":"json_object"},
-            messages=[{"role":"system","content":system_msg},{"role":"user","content":user_msg}],
+            messages=[{"role":"system","content":"Je bent een stylist. Schrijf kort B1 NL."},
+                      {"role":"user","content":f"Geef JSON advies voor {link}"}],
             temperature=0.4, max_tokens=600,
         )
         data = json.loads(resp.choices[0].message.content)
         data.setdefault("headline", product_name or "Snel advies")
-        pers = data.setdefault("personal_advice", {})
-        pers.setdefault("for_you", []); pers.setdefault("avoid", [])
-        pers.setdefault("colors", []);  pers.setdefault("combine", [])
         return data
     except Exception:
-        return {
-            "headline": product_name or "Snel advies",
-            "personal_advice": {
-                "for_you": ["Kies silhouet passend bij jouw lengte","Houd lijnen rustig voor casual look","Laat kleur aansluiten op jouw vibe"],
-                "avoid": ["Vermijd te druk als je minimal wil","Vermijd harde contrasten bij zachte vibe"],
-                "colors": ["Neutraal: ecru, zand, navy","Accent: olijf of bordeaux"],
-                "combine": ["Rechte jeans of chino","Witte sneaker of loafer"]
-            }
-        }
+        return {"headline": product_name or "Snel advies",
+                "personal_advice":{"for_you":["Kies casual","Houd lijnen rustig","Kies zachte tinten"],
+                                   "avoid":["Vermijd te druk","Vermijd contrasten"],
+                                   "colors":["Neutraal: ecru","Accent: olijf"],
+                                   "combine":["Jeans","Sneakers"]}}
 
-# ---------- HEADER als component ----------
+# ---------- HEADER ----------
 def render_header():
     components.html("""
-    <div style="
-        display:flex;align-items:center;gap:14px;margin:10px 0 8px;
-        color:#fff;filter:drop-shadow(0 6px 22px rgba(0,0,0,.15));
-    ">
+    <div style="display:flex;align-items:center;gap:14px;margin:10px 0 8px;color:#fff;">
       <svg width="40" height="40" viewBox="0 0 24 24" fill="#fff"
            xmlns="http://www.w3.org/2000/svg"><path d="M8 3l1.5 3-2 3 2 11h5l2-11-2-3L16 3h-2l-1 2-1-2H8z"/></svg>
       <h1 style="font:800 44px/1 'Inter',system-ui;letter-spacing:-.02em;margin:0;">Fashion AI Stylist</h1>
     </div>
     """, height=70)
 
-# ---------- HERO als component ----------
+# ---------- HERO ----------
 def render_hero(link_prefill: str = ""):
     components.html(f"""
 <!doctype html><html><head><meta charset="utf-8"/>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-  body{{margin:0}}
+  body{{margin:0;font-family:Inter,system-ui}}
   .hero{{background:#fff;border:1px solid #EFEBFF;border-radius:22px;
-        box-shadow:0 16px 40px rgba(23,0,75,.18);padding:22px;margin-top:8px;
-        font-family:Inter,system-ui}}
+        box-shadow:0 16px 40px rgba(23,0,75,.18);padding:22px;margin-top:8px;}}
   .hero-title{{font:800 34px/1.2 Inter,system-ui;color:#1f2358;letter-spacing:-.02em;margin:0 0 14px}}
   .row{{display:flex;gap:12px;align-items:center}}
   .inp{{flex:1;background:#fff;border:1px solid #E3E6FF;border-radius:14px;height:52px;
         padding:0 14px;font:500 16px Inter,system-ui;outline:none}}
-  .inp:focus{{border-color:#8C72FF;box-shadow:0 0 0 3px rgba(140,114,255,.20)}}
   .btn{{border:0;border-radius:14px;padding:14px 20px;font:800 16px Inter,system-ui;cursor:pointer;
         color:#fff;background:linear-gradient(180deg,#8C72FF 0%,#6F5BFF 100%);
         box-shadow:0 12px 28px rgba(23,0,75,.35)}}
-  .chip{{display:inline-flex;align-items:center;gap:8px;margin-top:12px;padding:10px 14px;border-radius:12px;
-         background:rgba(255,255,255,.70);border:1px solid rgba(255,255,255,.85);
-         color:#2d2a6c;text-decoration:none;font:700 14px Inter,system-ui}}
 </style>
 <div class="hero">
   <div class="hero-title">Plak een productlink en krijg direct stijl-advies</div>
@@ -361,112 +270,53 @@ def render_hero(link_prefill: str = ""):
         const u=new URL(window.parent.location.href);
         u.searchParams.set('auto','1'); u.searchParams.set('u',v);
         window.parent.location=u.toString();
-      }} else {{ alert('Plak eerst een geldige URL (https://...)'); }}
+      }} else {{ alert('Plak eerst een geldige URL'); }}
     ">Advies ophalen</button>
   </div>
-  <a class="chip" href="javascript:(function(){{window.open('{APP_URL}?auto=1&u='+encodeURIComponent(window.location.href),'_blank');}})();">
-    ➕ Gebruik onze bookmarklet
-  </a>
 </div>
 </html>
-""", height=190, scrolling=False)
+""", height=140, scrolling=False)
 
-# ---------- Render kaart 1: advies ----------
+# ---------- RENDER ADVIES ----------
 def render_single_card(data: dict, link: str):
-    product_name = _product_name(link)
-    headline = esc(data.get("headline", product_name or "Kort advies"))
+    headline = esc(data.get("headline","Advies"))
     pers = data.get("personal_advice", {})
-    for_you = [esc(x) for x in as_list(pers.get("for_you"))][:3]
-    avoid   = [esc(x) for x in as_list(pers.get("avoid"))][:2]
-    colors  = [esc(x) for x in as_list(pers.get("colors"))][:2]
-    combine = [esc(x) for x in as_list(pers.get("combine"))][:2]
-    html = f"""
+    for_you = as_list(pers.get("for_you"))[:3]
+    avoid   = as_list(pers.get("avoid"))[:2]
+    colors  = as_list(pers.get("colors"))[:2]
+    combine = as_list(pers.get("combine"))[:2]
+    st.markdown(f"""
 <div class="card">
   <div class="card-title">{DRESS_SVG} {headline}</div>
   <div class="card-sub">
     <div class="section-h">• Specifiek advies voor jou</div>
-    <ul>{''.join([f"<li>{x}</li>" for x in for_you])}</ul>
-
+    <ul>{''.join([f"<li>{esc(x)}</li>" for x in for_you])}</ul>
     <div class="section-h">• Kleur & combineren</div>
-    <ul>{''.join([f"<li>{x}</li>" for x in colors])}{''.join([f"<li>{x}</li>" for x in combine])}</ul>
-
+    <ul>{''.join([f"<li>{esc(x)}</li>" for x in colors+combine])}</ul>
     <div class="section-h">• Liever vermijden</div>
-    <ul>{''.join([f"<li>{x}</li>" for x in avoid])}</ul>
+    <ul>{''.join([f"<li>{esc(x)}</li>" for x in avoid])}</ul>
   </div>
 </div>
-"""
-    st.markdown(_html_noindent(html), unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
-# ---------- Render kaart 2: bijpassende links (chips) + inline CTA ----------
+# ---------- RENDER MATCHING LINKS ----------
 def render_matching_links_card(data: dict, link: str):
     pers = data.get("personal_advice", {})
-    combine_raw = as_list(pers.get("combine"))
-    queries = _queries_from_combine(combine_raw, max_links=4)
+    queries = _queries_from_combine(as_list(pers.get("combine")), max_links=4)
 
-    # Link-icoon (paars)
-    LINK_SVG = """
-    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <path d="M10 14l-1 1a4 4 0 105.7 5.7l2.6-2.6a4 4 0 00-5.7-5.7l-.6.6"
-            stroke="#6F5BFF" stroke-width="2" stroke-linecap="round" fill="none"/>
-      <path d="M14 10l1-1a4 4 0 10-5.7-5.7L6.7 5.9a4 4 0 105.7 5.7l.6-.6"
-            stroke="#6F5BFF" stroke-width="2" stroke-linecap="round" fill="none"/>
-    </svg>
-    """
+    LINK_SVG = """<svg viewBox="0 0 24 24"><path d="M10 14l-1 1a4 4 0 105.7 5.7l2.6-2.6a4 4 0 00-5.7-5.7l-.6.6"
+    stroke="#6F5BFF" stroke-width="2" stroke-linecap="round" fill="none"/>
+    <path d="M14 10l1-1a4 4 0 10-5.7-5.7L6.7 5.9a4 4 0 105.7 5.7l.6-.6"
+    stroke="#6F5BFF" stroke-width="2" stroke-linecap="round" fill="none"/></svg>"""
 
-    if not queries:
-        st.markdown(_html_noindent(f"""
-<div class="cta-inline">
-  <button class="cta-btn" onclick="
-    const u = new URL(window.location);
-    u.searchParams.set('prefs','1'); window.location.replace(u.toString());
-  ">{CHAT_SVG} <span>Vertel iets over jezelf</span></button>
-</div>
-"""), unsafe_allow_html=True)
-        return
+    if not queries: return
 
     chips_html = []
     for q in queries:
-        url   = _build_link_or_fallback(link, q)
-        label = f"Zoek: {html_escape(q)}"
-        chips_html.append(
-            f'<a class="chip" href="{url}" target="_blank" rel="nofollow noopener">{LINK_SVG} {label}</a>'
-        )
+        url = _build_link_or_fallback(link, q)
+        chips_html.append(f'<a class="chip" href="{url}" target="_blank">{LINK_SVG} Zoek: {esc(q)}</a>')
 
-    html = f"""
+    st.markdown(f"""
 <div class="card matching">
   <div class="card-title">{DRESS_SVG} Bijpassende kleding (op deze shop)</div>
-  <div class="card-sub">
-    <div class="btnrow">{''.join(chips_html)}</div>
-    <div class="note">We zoeken eerst binnen deze shop; lukt dat niet, dan via Google.</div>
-  </div>
-</div>
-
-<div class="cta-inline">
-  <button class="cta-btn" onclick="
-    const u = new URL(window.location);
-    u.searchParams.set('prefs','1'); window.location.replace(u.toString());
-  ">{CHAT_SVG} <span>Vertel iets over jezelf</span></button>
-</div>
-"""
-    st.markdown(_html_noindent(html), unsafe_allow_html=True)
-
-# ======================= UI FLOW =======================
-
-# State
-if "last_link" not in st.session_state:
-    st.session_state.last_link = ""
-
-# Header + Hero (geïsoleerd → geen extra wit blok erboven)
-render_header()
-prefill = link_qs if (auto and link_qs) else st.session_state.last_link
-render_hero(link_prefill=prefill)
-
-# Actieve link bepalen (na hero-redirect komt hij via ?auto=1&u=...)
-active_link = link_qs if (auto and link_qs) else st.session_state.last_link
-
-# Render advies
-if active_link:
-    st.session_state.last_link = active_link
-    data = get_advice_json(active_link)
-    render_single_card(data, active_link)
-    render_matching_links_card(data, active_link)
+  <div
