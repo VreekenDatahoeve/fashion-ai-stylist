@@ -1,4 +1,4 @@
-# app.py — Fashion AI Stylist (panel mode + schema-fix + matching chips)
+# app.py — Fashion AI Stylist (panel mode + compact header + schema-fix + matching chips)
 import os, re, json
 import streamlit as st
 import streamlit.components.v1 as components
@@ -8,7 +8,7 @@ from textwrap import dedent
 from openai import OpenAI
 
 # ========= Instellingen =========
-APP_URL = "https://fashion-ai-stylis-ifidobqmkgjtn7gjxgrudb.streamlit.app"  # je publieke URL (optioneel)
+APP_URL = "https://fashion-ai-stylis-ifidobqmkgjtn7gjxgrudb.streamlit.app"  # optioneel
 MODEL   = "gpt-4o-mini"
 # =================================
 
@@ -79,8 +79,22 @@ li{ margin: 6px 0; }
 .matching .chip svg{ width:16px; height:16px; }
 .matching .note{ color:#6B7280; font-size:13px; margin-top:10px; }
 
-/* ===== Popup/Panel-modus ===== */
-body[data-panel="1"] .block-container{ max-width: 560px; padding-top: 8px !important; padding-bottom: 28px !important; }
+/* ===== Compacte header voor panel modus ===== */
+body[data-panel="1"] .compact-header{
+  background:#ffffffcc; border:1px solid #EFEBFF; border-radius:12px;
+  display:flex; align-items:center; gap:10px;
+  padding:10px 12px; margin:6px 0 6px;
+  box-shadow:0 10px 26px rgba(23,0,75,.18); backdrop-filter: blur(4px);
+}
+body[data-panel="1"] .compact-header .title{
+  font-weight:800; font-size:18px; color:#1f2358; letter-spacing:-.01em; margin:0;
+}
+body[data-panel="1"] .compact-header .icon{
+  width:22px; height:22px; display:inline-block;
+}
+
+/* ===== Popup/Panel-modus typografie ===== */
+body[data-panel="1"] .block-container{ max-width: 560px; padding-top: 6px !important; padding-bottom: 24px !important; }
 body[data-panel="1"] .card{ padding: 14px !important; border-radius: 16px !important; }
 body[data-panel="1"] .card-title{ font-size: 20px !important; margin-bottom: 6px !important; }
 body[data-panel="1"] .section-h{ font-size: 15px !important; margin:10px 0 4px !important; }
@@ -259,7 +273,16 @@ Schrijfregels:
     except Exception:
         return _ensure_schema({}, product_name, keywords)
 
-# ---------- RENDER ADVIES ----------
+# ---------- RENDER UI ----------
+def render_compact_header():
+    """Kleine header voor panel-modus (app-naam + icoon)."""
+    components.html(f"""
+    <div class="compact-header">
+      <span class="icon">{DRESS_SVG}</span>
+      <h2 class="title">Fashion AI Stylist</h2>
+    </div>
+    """, height=44)
+
 def render_single_card(data: dict, link: str):
     headline = esc(data.get("headline","Advies"))
     pers = data.get("personal_advice", {})
@@ -281,7 +304,6 @@ def render_single_card(data: dict, link: str):
 </div>
 """, unsafe_allow_html=True)
 
-# ---------- RENDER MATCHING LINKS ----------
 def render_matching_links_card(data: dict, link: str):
     pers = data.get("personal_advice", {})
     queries = _queries_from_combine(as_list(pers.get("combine")), max_links=4)
@@ -309,7 +331,6 @@ def render_matching_links_card(data: dict, link: str):
 </div>
 """, unsafe_allow_html=True)
 
-# ---------- HERO (alleen buiten panel) ----------
 def render_hero(link_prefill: str = ""):
     components.html(f"""
 <!doctype html><html><head><meta charset="utf-8"/>
@@ -341,23 +362,25 @@ def render_hero(link_prefill: str = ""):
 # ======================= MAIN FLOW =======================
 
 if panel and link_qs and auto:
-    # Popupmodus: direct advies + matching
+    # Compacte header (nieuw)
+    render_compact_header()
+    # Direct advies + matching
     data = get_advice_json(link_qs)
     render_single_card(data, link_qs)
     render_matching_links_card(data, link_qs)
 
 else:
-    # Normale modus: hero tonen en daarna (eventueel) advies renderen
-    if "last_link" not in st.session_state:
-        st.session_state.last_link = ""
-    prefill = link_qs if (auto and link_qs) else st.session_state.last_link
-    # Header
+    # Normale modus: header + hero, daarna advies
     components.html("""
     <div style="display:flex;align-items:center;gap:14px;margin:10px 0 8px;color:#fff;">
       <svg width="40" height="40" viewBox="0 0 24 24" fill="#fff" xmlns="http://www.w3.org/2000/svg"><path d="M8 3l1.5 3-2 3 2 11h5l2-11-2-3L16 3h-2l-1 2-1-2H8z"/></svg>
       <h1 style="font:800 44px/1 'Inter',system-ui;letter-spacing:-.02em;margin:0;">Fashion AI Stylist</h1>
     </div>
     """, height=70)
+
+    if "last_link" not in st.session_state:
+        st.session_state.last_link = ""
+    prefill = link_qs if (auto and link_qs) else st.session_state.last_link
     render_hero(prefill)
 
     active_link = link_qs if (auto and link_qs) else st.session_state.last_link
