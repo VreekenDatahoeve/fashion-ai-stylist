@@ -48,7 +48,7 @@ st.set_page_config(
 )
 
 # ---------- CSS ----------
-st.markdown(dedent("""
+st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
 
@@ -63,16 +63,15 @@ footer { visibility:hidden; }
 
 .block-container{
   max-width: 860px;
-  padding-top: 12px !important;
-  padding-bottom: 80px !important;
+  padding-top: 16px !important;
+  padding-bottom: 90px !important;
 }
 
-/* Cards */
+/* ---------- CARDS ---------- */
 .card{
-  background:#ffffff; border-radius: 22px; padding: 18px 20px;
+  background:#ffffff; border-radius: 22px; padding: 22px;
   box-shadow: 0 16px 40px rgba(23,0,75,0.18);
-  border: 1px solid #EFEBFF;
-  margin-top: 14px;
+  border: 1px solid #EFEBFF; margin-top: 16px;
 }
 .card-title{
   font-size: 26px; font-weight: 800; color:#1f2358; margin:0 0 12px;
@@ -80,38 +79,50 @@ footer { visibility:hidden; }
 }
 .card-sub{ color:#2b2b46; }
 
-/* Hero input card */
-.hero-title{
-  font-size: 30px; font-weight: 800; color:#1f2358; margin:0 0 12px;
+/* ---------- HERO ---------- */
+.hero{
+  background:#ffffff; border:1px solid #EFEBFF; border-radius:22px;
+  box-shadow: 0 16px 40px rgba(23,0,75,0.18); padding: 22px; margin-top: 8px;
 }
-.hero-row{ display:flex; gap:10px; align-items:center; }
-.hero-input input{ border-radius:12px !important; min-height:48px; font-size:16px; }
-.hero-btn .st-emotion-cache-ocqkz7{ border-radius:12px; font-weight:800; }
+.hero-title{
+  font-size: 34px; font-weight: 800; color:#1f2358; margin: 0 0 14px;
+  letter-spacing:-.02em;
+}
+.hero-row{ display:flex; gap:12px; align-items:center; }
+.hero-input input{
+  border-radius:14px !important; min-height:52px; font-size:16px; padding-left:14px;
+  border:1px solid #E3E6FF !important;
+}
+.hero-btn{
+  border:none; border-radius:14px; padding:14px 20px; font-weight:800; cursor:pointer;
+  background: linear-gradient(180deg, #8C72FF 0%, #6F5BFF 100%); color:#fff;
+  box-shadow: 0 12px 28px rgba(23,0,75,0.35);
+}
 
 /* Bookmarklet chip */
 .note-chip{
   display:inline-flex; align-items:center; gap:8px;
-  margin-top:10px; padding:10px 14px; border-radius:12px;
+  margin-top:12px; padding:10px 14px; border-radius:12px;
   background: rgba(255,255,255,0.70);
   border:1px solid rgba(255,255,255,0.85);
   color:#2d2a6c; font-weight:700; text-decoration:none;
   box-shadow: 0 10px 24px rgba(40,12,120,0.15); backdrop-filter: blur(4px);
 }
 
-/* Sections + lists */
-.section-h{ font-weight:800; margin:12px 0 6px; color:#1f2358; }
-ul{ margin: 0 0 0 1.15rem; padding:0; }
+/* ---------- LISTS & SECTIONS ---------- */
+.section-h{ font-weight:800; margin:14px 0 6px; color:#1f2358; }
+ul{ margin: 0 0 0 1.15rem; padding:0; line-height:1.6; }
 li{ margin: 6px 0; }
 
-/* Buttons row */
+/* ---------- BUTTONS ROW ---------- */
 .btnrow{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
 .btn{
   display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px;
   background:#F3F4FF; color:#2d2a6c; border:1px solid #E3E6FF; text-decoration:none; font-weight:700;
 }
 
-/* Inline CTA onder de 2e kaart */
-.cta-inline{ display:flex; justify-content:center; margin-top: 14px; }
+/* ---------- INLINE CTA ---------- */
+.cta-inline{ display:flex; justify-content:center; margin-top: 16px; }
 .cta-btn{
   background: linear-gradient(180deg, #8C72FF 0%, #6F5BFF 100%);
   color:#ffffff; border:none; border-radius:999px; padding: 14px 22px; font-weight:800;
@@ -121,10 +132,10 @@ li{ margin: 6px 0; }
 .cta-btn .icon svg{ width:22px; height:22px; fill:#fff; }
 .small-note{ color:#6B7280; font-size: 13px; }
 
-/* Icon in titel */
+/* Titel-icoon */
 .title-icon{ width:22px; height:22px; }
 </style>
-"""), unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # ---------- Query params ----------
 qp = st.query_params
@@ -384,17 +395,20 @@ Schrijfregels:
 
 # ---------- Render: hero input + bookmarklet ----------
 def render_hero(link_prefill: str = "") -> str:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+    # open hero-card
+    st.markdown('<div class="hero">', unsafe_allow_html=True)
     st.markdown('<div class="hero-title">Plak een productlink en krijg direct stijl-advies</div>', unsafe_allow_html=True)
 
-    c1, c2 = st.columns([5,2])
+    c1, c2 = st.columns([5,2], vertical_alignment="center")
     with c1:
-        link = st.text_input("",
-                             value=link_prefill,
-                             placeholder="https://…",
-                             label_visibility="collapsed",
-                             key="hero_link",
-                             help="Plak hier de URL van een product.")
+        st.text_input(
+            label="",
+            value=link_prefill,
+            placeholder="https://…",
+            label_visibility="collapsed",
+            key="hero_link",
+            help="Plak hier de URL van een product."
+        )
         st.markdown(
             f"""
             <a class="note-chip" href="javascript:(function(){{window.open('{APP_URL}?auto=1&u='+encodeURIComponent(location.href),'_blank');}})();" title="Sleep naar je favorietenbalk en klik tijdens het shoppen.">
@@ -404,10 +418,24 @@ def render_hero(link_prefill: str = "") -> str:
             unsafe_allow_html=True
         )
     with c2:
-        st.write("")  # vertical align
-        go = st.button("Advies ophalen", use_container_width=True, type="primary")
-    st.markdown('</div>', unsafe_allow_html=True)
-    return link if go and link else ""
+        # echte HTML-knop voor exacte styling (stuurt naar dezelfde app met queryparams)
+        st.markdown("""
+            <button class="hero-btn" onclick="
+                const v = document.querySelector('.hero input[type=text]').value 
+                          || document.querySelector('input[type=text]').value;
+                if(v && /^https?:\\/\\//i.test(v)){
+                    const u=new URL(window.location.href);
+                    u.searchParams.set('auto','1');
+                    u.searchParams.set('u', v);
+                    window.location = u.toString();
+                } else {
+                    alert('Plak eerst een geldige URL (https://...)');
+                }
+            ">Advies ophalen</button>
+        """, unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)  # close .hero
+    return ""  # we gebruiken de knop-redirect i.p.v. een Streamlit-button return
 
 # ---------- Render kaart 1: advies ----------
 def render_single_card(data: dict, link: str):
