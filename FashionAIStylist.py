@@ -1,7 +1,7 @@
 # app.py — MVP: Advies + Bijpassende links (inline CTA onder tweede kaart)
 import os, re, json
 import streamlit as st
-from urllib.parse import urlparse, quote
+from urllib.parse import urlparse, quote, urlencode
 from html import escape as html_escape
 from textwrap import dedent
 from openai import OpenAI
@@ -83,11 +83,11 @@ li{ margin: 6px 0; }
 }
 .btn svg{ width:18px; height:18px; }
 
-/* Inline CTA (geen fixed position) */
-.cta-inline{ 
-  display:flex; 
-  justify-content:center;   /* knop centreren onder de kaart */
-  margin-top: 12px; 
+/* Inline CTA (geen JS; we gebruiken een <a> link) */
+.cta-inline{
+  display:flex;
+  justify-content:center;
+  margin-top: 12px;
 }
 .cta-btn{
   background: linear-gradient(180deg, #8C72FF 0%, #6F5BFF 100%);
@@ -95,15 +95,15 @@ li{ margin: 6px 0; }
   padding: 14px 22px; font-weight:800;
   box-shadow: 0 16px 36px rgba(23,0,75,0.40);
   display:inline-flex; align-items:center; gap:12px; cursor:pointer;
-  line-height: 1; /* perfecte verticale centrering */
+  line-height: 1; text-decoration:none;
 }
 .cta-btn .icon{
-  width:28px; height:28px;                     /* groter icoon */
-  display:inline-flex; align-items:center; 
-  justify-content:center;                      /* exact in het midden */
+  width:28px; height:28px;
+  display:inline-flex; align-items:center;
+  justify-content:center;
 }
-.cta-btn .icon svg{ 
-  width:22px; height:22px; fill:#fff;          /* schaal van het pictogram zelf */
+.cta-btn .icon svg{
+  width:22px; height:22px; fill:#fff;
 }
 
 /* Input-card */
@@ -131,40 +131,83 @@ def _get(name, default=""):
 
 link_qs = _get("u").strip()
 auto    = str(_get("auto","0")) == "1"
-prefs_q = _get("prefs","0") == "1"
+
+# ---------- Profiel in query params ----------
+DEFAULT_PROFILE = {
+    "pf_l":   "Weet ik niet",         # lichaamsvorm
+    "pf_h":   "Medium",                # huidskleur
+    "pf_len": "1.60 - 1.75m",          # lengte
+    "pf_g":   "Vrije tijd",            # gelegenheid
+    "pf_ge":  "Casual",                # gevoel
+}
+
+def _qp_get_one(name, default):
+    v = st.query_params.get(name, default)
+    if isinstance(v, list):
+        return v[0] if v else default
+    return v
+
+def _qp_to_dict():
+    out = {}
+    for k, v in st.query_params.items():
+        out[k] = v[0] if isinstance(v, list) and v else v
+    return out
+
+def load_profile_from_params():
+    return {
+        "pf_l":   _qp_get_one("pf_l",   DEFAULT_PROFILE["pf_l"]),
+        "pf_h":   _qp_get_one("pf_h",   DEFAULT_PROFILE["pf_h"]),
+        "pf_len": _qp_get_one("pf_len", DEFAULT_PROFILE["pf_len"]),
+        "pf_g":   _qp_get_one("pf_g",   DEFAULT_PROFILE["pf_g"]),
+        "pf_ge":  _qp_get_one("pf_ge",  DEFAULT_PROFILE["pf_ge"]),
+    }
+
+def save_profile_to_params(prof: dict, keep_prefs_open: bool):
+    new_qp = _qp_to_dict()
+    new_qp.update({
+        "pf_l":   prof.get("pf_l",   DEFAULT_PROFILE["pf_l"]),
+        "pf_h":   prof.get("pf_h",   DEFAULT_PROFILE["pf_h"]),
+        "pf_len": prof.get("pf_len", DEFAULT_PROFILE["pf_len"]),
+        "pf_g":   prof.get("pf_g",   DEFAULT_PROFILE["pf_g"]),
+        "pf_ge":  prof.get("pf_ge",  DEFAULT_PROFILE["pf_ge"]),
+        "prefs":  "1" if keep_prefs_open else "0",
+    })
+    st.query_params.clear()
+    st.query_params.update(new_qp)
+
+def build_url_with_params(updates: dict) -> str:
+    d = _qp_to_dict()
+    d.update(updates)
+    return APP_URL + "?" + urlencode(d)
+
+PROFILE = load_profile_from_params()
 
 # ---------- Sidebar voorkeuren ----------
 if "show_prefs" not in st.session_state:
-    st.session_state.show_prefs = (prefs_q or _get("prefs","0") == "1")
+    st.session_state.show_prefs = (_get("prefs","0") == "1")
+
+opt_l   = ["Zandloper","Peer","Rechthoek","Appel","Weet ik niet"]
+opt_h   = ["Licht","Medium","Donker"]
+opt_len = ["< 1.60m","1.60 - 1.75m","> 1.75m"]
+opt_g   = ["Werk","Feest","Vrije tijd","Bruiloft","Date"]
+opt_ge  = ["Zelfverzekerd","Speels","Elegant","Casual","Trendy"]
+
+def _safe_index(options, value):
+    return options.index(value) if value in options else 0
 
 if st.session_state.show_prefs:
     with st.sidebar:
         st.markdown("### 👤 Vertel iets over jezelf")
-        lichaamsvorm = st.selectbox("Lichaamsvorm",
-            ["Zandloper","Peer","Rechthoek","Appel","Weet ik niet"],
-            index=["Zandloper","Peer","Rechthoek","Appel","Weet ik niet"].index(PROFILE["pf_l"]),
-            key="pf_l"
-        )
-        huidskleur = st.selectbox("Huidskleur",
-            ["Licht","Medium","Donker"],
-            index=["Licht","Medium","Donker"].index(PROFILE["pf_h"]),
-            key="pf_h"
-        )
-        lengte = st.selectbox("Lengte",
-            ["< 1.60m","1.60 - 1.75m","> 1.75m"],
-            index=["< 1.60m","1.60 - 1.75m","> 1.75m"].index(PROFILE["pf_len"]),
-            key="pf_len"
-        )
-        gelegenheid = st.selectbox("Gelegenheid",
-            ["Werk","Feest","Vrije tijd","Bruiloft","Date"],
-            index=["Werk","Feest","Vrije tijd","Bruiloft","Date"].index(PROFILE["pf_g"]),
-            key="pf_g"
-        )
-        gevoel = st.selectbox("Gevoel",
-            ["Zelfverzekerd","Speels","Elegant","Casual","Trendy"],
-            index=["Zelfverzekerd","Speels","Elegant","Casual","Trendy"].index(PROFILE["pf_ge"]),
-            key="pf_ge"
-        )
+        lichaamsvorm = st.selectbox("Lichaamsvorm", opt_l,
+            index=_safe_index(opt_l, PROFILE["pf_l"]), key="pf_l")
+        huidskleur = st.selectbox("Huidskleur", opt_h,
+            index=_safe_index(opt_h, PROFILE["pf_h"]), key="pf_h")
+        lengte = st.selectbox("Lengte", opt_len,
+            index=_safe_index(opt_len, PROFILE["pf_len"]), key="pf_len")
+        gelegenheid = st.selectbox("Gelegenheid", opt_g,
+            index=_safe_index(opt_g, PROFILE["pf_g"]), key="pf_g")
+        gevoel = st.selectbox("Gevoel", opt_ge,
+            index=_safe_index(opt_ge, PROFILE["pf_ge"]), key="pf_ge")
 
         c1, c2 = st.columns(2)
         with c1:
@@ -424,17 +467,16 @@ def render_matching_links_card(data: dict, link: str):
     pers = data.get("personal_advice", {})
     combine_raw = as_list(pers.get("combine"))
     queries = _queries_from_combine(combine_raw, max_links=4)
+
+    prefs_url = build_url_with_params({"prefs": "1"})
+
     if not queries:
-        # Toon alleen inline CTA als er geen queries zijn
+        # Toon alleen inline CTA (zonder JS; gewoon een link met params)
         html_only_cta = f"""
 <div class="cta-inline">
-  <button class="cta-btn" onclick="
-    const u = new URL(window.location);
-    u.searchParams.set('prefs','1');
-    window.location.replace(u.toString());
-  ">
+  <a class="cta-btn" href="{prefs_url}">
     {CHAT_SVG} <span>Vertel iets over jezelf</span>
-  </button>
+  </a>
 </div>
 """
         st.markdown(_html_noindent(html_only_cta), unsafe_allow_html=True)
@@ -466,13 +508,9 @@ def render_matching_links_card(data: dict, link: str):
 
 <!-- Inline CTA direct onder de kaart -->
 <div class="cta-inline">
-  <button class="cta-btn" onclick="
-    const u = new URL(window.location);
-    u.searchParams.set('prefs','1');
-    window.location.replace(u.toString());
-  ">
+  <a class="cta-btn" href="{prefs_url}">
     {CHAT_SVG} <span>Vertel iets over jezelf</span>
-  </button>
+  </a>
 </div>
 """
     st.markdown(_html_noindent(html), unsafe_allow_html=True)
