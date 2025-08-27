@@ -277,9 +277,17 @@ Schrijfregels:
 def render_compact_header():
     """Kleine header voor panel-modus (app-naam + icoon)."""
     components.html(f"""
-    <div class="compact-header">
-      <span class="icon">{DRESS_SVG}</span>
-      <h2 class="title">Fashion AI Stylist</h2>
+    <div style="
+        display:flex;align-items:center;gap:8px;
+        background:#fff; border:1px solid #EFEBFF; border-radius:10px;
+        padding:6px 12px; margin:4px 0 10px;
+        box-shadow:0 6px 14px rgba(23,0,75,.15);
+        max-width: 260px;
+    ">
+      <div style="width:20px;height:20px;">{DRESS_SVG}</div>
+      <span style="font-weight:800;font-size:16px;color:#1f2358;letter-spacing:-.01em;">
+        Fashion AI Stylist
+      </span>
     </div>
     """, height=44)
 
