@@ -309,7 +309,8 @@ def render_matching_links_card(data: dict, link: str):
     <path d="M14 10l1-1a4 4 0 10-5.7-5.7L6.7 5.9a4 4 0 105.7 5.7l.6-.6"
     stroke="#6F5BFF" stroke-width="2" stroke-linecap="round" fill="none"/></svg>"""
 
-    if not queries: return
+    if not queries:
+        return
 
     chips_html = []
     for q in queries:
@@ -319,4 +320,11 @@ def render_matching_links_card(data: dict, link: str):
     st.markdown(f"""
 <div class="card matching">
   <div class="card-title">{DRESS_SVG} Bijpassende kleding (op deze shop)</div>
-  <div
+  <div class="card-sub">
+    <div class="btnrow">
+      {''.join(chips_html)}
+    </div>
+    <div class="note">We zoeken eerst binnen deze shop; lukt dat niet, dan via Google.</div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
