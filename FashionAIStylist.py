@@ -1,4 +1,4 @@
-# app.py — Fashion AI Stylist (hero als geïsoleerde component)
+# app.py — Fashion AI Stylist (hero als component + matching chips)
 import os, re, json
 import streamlit as st
 import streamlit.components.v1 as components
@@ -85,6 +85,7 @@ footer { visibility:hidden; }
 ul{ margin: 0 0 0 1.15rem; padding:0; line-height:1.6; }
 li{ margin: 6px 0; }
 
+/* Buttons baseline (kan elders gebruikt worden) */
 .btnrow{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
 .btn{
   display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px;
@@ -103,6 +104,20 @@ li{ margin: 6px 0; }
 .small-note{ color:#6B7280; font-size: 13px; }
 
 .title-icon{ width:22px; height:22px; }
+
+/* --- Matching links: compacte chips (visueel identiek aan referentie) --- */
+.matching .btnrow{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
+.matching .chip{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:10px 14px; border-radius:12px;
+  background:#F3F4FF; border:1px solid #E3E6FF;
+  text-decoration:none; font-weight:700; color:#1f2a5a;
+  box-shadow: 0 4px 14px rgba(23,0,75,0.12);
+  transition: transform .04s ease;
+}
+.matching .chip:hover{ transform: translateY(-1px); }
+.matching .chip svg{ width:18px; height:18px; }
+.matching .note{ color:#6B7280; font-size:13px; margin-top:10px; }
 </style>
 """), unsafe_allow_html=True)
 
@@ -202,7 +217,7 @@ _STOPWORDS_RE = re.compile(
 _SEP_RE = re.compile(r"\b(?:of|en|,|/|\+|&)\b", re.IGNORECASE)
 
 def _normalize_query_piece(p: str) -> str:
-    p = re.sub(r"[^0-9A-Za-zÀ-ÿ\- ]+", "", p)
+    p = re.sub(r"[^0-9A-Za-zÀ-ÿ\\- ]+", "", p)
     p = re.sub(r"\s+", " ", p).strip()
     return p
 
@@ -314,7 +329,7 @@ def render_header():
     </div>
     """, height=70)
 
-# ---------- HERO als component (geïsoleerd; geen Streamlit-input) ----------
+# ---------- HERO als component ----------
 def render_hero(link_prefill: str = ""):
     components.html(f"""
 <!doctype html><html><head><meta charset="utf-8"/>
@@ -382,11 +397,21 @@ def render_single_card(data: dict, link: str):
 """
     st.markdown(_html_noindent(html), unsafe_allow_html=True)
 
-# ---------- Render kaart 2: bijpassende links + inline CTA ----------
+# ---------- Render kaart 2: bijpassende links (chips) + inline CTA ----------
 def render_matching_links_card(data: dict, link: str):
     pers = data.get("personal_advice", {})
     combine_raw = as_list(pers.get("combine"))
     queries = _queries_from_combine(combine_raw, max_links=4)
+
+    # Link-icoon (paars)
+    LINK_SVG = """
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M10 14l-1 1a4 4 0 105.7 5.7l2.6-2.6a4 4 0 00-5.7-5.7l-.6.6"
+            stroke="#6F5BFF" stroke-width="2" stroke-linecap="round" fill="none"/>
+      <path d="M14 10l1-1a4 4 0 10-5.7-5.7L6.7 5.9a4 4 0 105.7 5.7l.6-.6"
+            stroke="#6F5BFF" stroke-width="2" stroke-linecap="round" fill="none"/>
+    </svg>
+    """
 
     if not queries:
         st.markdown(_html_noindent(f"""
@@ -395,25 +420,24 @@ def render_matching_links_card(data: dict, link: str):
     const u = new URL(window.location);
     u.searchParams.set('prefs','1'); window.location.replace(u.toString());
   ">{CHAT_SVG} <span>Vertel iets over jezelf</span></button>
-</div>"""), unsafe_allow_html=True)
+</div>
+"""), unsafe_allow_html=True)
         return
 
-    LINK_SVG2 = "<svg viewBox='0 0 24 24'><path d='M3.9 12a5 5 0 015-5h3v2h-3a3 3 0 100 6h3v2h-3a5 5 0 01-5-5zm7-3h3a5 5 0 110 10h-3v-2h3a3 3 0 100-6h-3V9z'/></svg>"
-
-    buttons = []
+    chips_html = []
     for q in queries:
-        url = _build_link_or_fallback(link, q)
-        label = f'Zoek: {html_escape(q)}'
-        buttons.append(f'<a class="btn" href="{url}" target="_blank" rel="nofollow noopener">{LINK_SVG2} {label}</a>')
+        url   = _build_link_or_fallback(link, q)
+        label = f"Zoek: {html_escape(q)}"
+        chips_html.append(
+            f'<a class="chip" href="{url}" target="_blank" rel="nofollow noopener">{LINK_SVG} {label}</a>'
+        )
 
     html = f"""
-<div class="card">
+<div class="card matching">
   <div class="card-title">{DRESS_SVG} Bijpassende kleding (op deze shop)</div>
   <div class="card-sub">
-    <div class="btnrow">{''.join(buttons)}</div>
-    <div class="small-note" style="margin-top:10px;">
-      We zoeken eerst binnen deze shop; lukt dat niet, dan via Google.
-    </div>
+    <div class="btnrow">{''.join(chips_html)}</div>
+    <div class="note">We zoeken eerst binnen deze shop; lukt dat niet, dan via Google.</div>
   </div>
 </div>
 
