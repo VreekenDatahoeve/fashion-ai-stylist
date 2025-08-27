@@ -1,6 +1,7 @@
-# app.py — Fashion AI Stylist (mockup-accurate UI, hero 100% HTML)
+# app.py — Fashion AI Stylist (hero als geïsoleerde component)
 import os, re, json
 import streamlit as st
+import streamlit.components.v1 as components
 from urllib.parse import urlparse, quote
 from html import escape as html_escape
 from textwrap import dedent
@@ -34,7 +35,8 @@ def get_params_profile():
 
 def save_profile_to_params(p: dict, keep_prefs_open: bool = True):
     u = st.query_params
-    for k, v in p.items(): u[k] = v
+    for k, v in p.items():
+        u[k] = v
     u["prefs"] = "1" if keep_prefs_open else "0"
     st.query_params = u
 
@@ -68,51 +70,7 @@ footer { visibility:hidden; }
   padding-bottom: 90px !important;
 }
 
-/* ===== App title ===== */
-.app-title{
-  display:flex; align-items:center; gap:14px;
-  color:#ffffff; margin: 10px 0 8px;
-}
-.app-title h1{
-  font-size: 44px; font-weight: 800; letter-spacing:-.02em;
-  margin: 0;
-  text-shadow: 0 4px 24px rgba(0,0,0,.18);
-}
-.app-title .icon{
-  width:40px; height:40px; filter: drop-shadow(0 6px 22px rgba(0,0,0,.25));
-}
-
-/* ===== Hero card ===== */
-.hero{
-  background:#ffffff; border:1px solid #EFEBFF; border-radius:22px;
-  box-shadow: 0 16px 40px rgba(23,0,75,0.18); padding: 22px; margin-top: 8px;
-}
-.hero-title{
-  font-size: 34px; font-weight: 800; color:#1f2358; margin: 0 0 14px; letter-spacing:-.02em;
-}
-.hero-row{ display:flex; gap:12px; align-items:center; }
-.hero-input{
-  flex:1; background:#fff; border:1px solid #E3E6FF; border-radius:14px;
-  height:52px; padding: 0 14px; font-size:16px; outline:none;
-}
-.hero-input:focus{ border-color:#8C72FF; box-shadow: 0 0 0 3px rgba(140,114,255,.20); }
-.hero-btn{
-  border:none; border-radius:14px; padding:14px 20px; font-weight:800; cursor:pointer;
-  background: linear-gradient(180deg, #8C72FF 0%, #6F5BFF 100%); color:#fff;
-  box-shadow: 0 12px 28px rgba(23,0,75,0.35);
-}
-
-/* Bookmarklet chip */
-.note-chip{
-  display:inline-flex; align-items:center; gap:8px;
-  margin-top:12px; padding:10px 14px; border-radius:12px;
-  background: rgba(255,255,255,0.70);
-  border:1px solid rgba(255,255,255,0.85);
-  color:#2d2a6c; font-weight:700; text-decoration:none;
-  box-shadow: 0 10px 24px rgba(40,12,120,0.15); backdrop-filter: blur(4px);
-}
-
-/* ===== Cards (advies / links) ===== */
+/* ===== Generic cards (advies / links) ===== */
 .card{
   background:#ffffff; border-radius: 22px; padding: 22px;
   box-shadow: 0 16px 40px rgba(23,0,75,0.18);
@@ -189,8 +147,7 @@ if st.session_state.show_prefs:
                 save_profile_to_params(prof, keep_prefs_open=False)
                 st.rerun()
 else:
-    for k,v in PROFILE.items():
-        st.session_state[k] = v
+    for k,v in PROFILE.items(): st.session_state[k] = v
 
 # ---------- Icons ----------
 DRESS_SVG = """<svg class="title-icon" viewBox="0 0 24 24" fill="#556BFF"><path d="M8 3l1.5 3-2 3 2 11h5l2-11-2-3L16 3h-2l-1 2-1-2H8z"/></svg>"""
@@ -344,39 +301,60 @@ Schrijfregels:
             }
         }
 
-# ---------- UI: header + hero ----------
+# ---------- HEADER als component ----------
 def render_header():
-    dress_svg = """<svg class="icon" viewBox="0 0 24 24" fill="#fff" xmlns="http://www.w3.org/2000/svg"><path d="M8 3l1.5 3-2 3 2 11h5l2-11-2-3L16 3h-2l-1 2-1-2H8z"/></svg>"""
-    st.markdown(f'''
-    <div class="app-title">
-        {dress_svg}
-        <h1>Fashion AI Stylist</h1>
+    components.html("""
+    <div style="
+        display:flex;align-items:center;gap:14px;margin:10px 0 8px;
+        color:#fff;filter:drop-shadow(0 6px 22px rgba(0,0,0,.15));
+    ">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="#fff"
+           xmlns="http://www.w3.org/2000/svg"><path d="M8 3l1.5 3-2 3 2 11h5l2-11-2-3L16 3h-2l-1 2-1-2H8z"/></svg>
+      <h1 style="font:800 44px/1 'Inter',system-ui;letter-spacing:-.02em;margin:0;">Fashion AI Stylist</h1>
     </div>
-    ''', unsafe_allow_html=True)
+    """, height=70)
 
+# ---------- HERO als component (geïsoleerd; geen Streamlit-input) ----------
 def render_hero(link_prefill: str = ""):
-    st.markdown('<div class="hero">', unsafe_allow_html=True)
-    st.markdown('<div class="hero-title">Plak een productlink en krijg direct stijl-advies</div>', unsafe_allow_html=True)
-    st.markdown(f"""
-    <div class="hero-row">
-        <input id="hero-url" class="hero-input" type="text" placeholder="https://…" value="{html_escape(link_prefill)}" />
-        <button class="hero-btn" onclick="
-            const v = document.getElementById('hero-url').value.trim();
-            if(v && /^https?:\\/\\//i.test(v)){{
-                const u = new URL(window.location.href);
-                u.searchParams.set('auto','1');
-                u.searchParams.set('u', v);
-                window.location = u.toString();
-            }} else {{
-                alert('Plak eerst een geldige URL (https://...)');
-            }}
-        ">Advies ophalen</button>
-    </div>
-    <a class="note-chip" href="javascript:(function(){{window.open('{APP_URL}?auto=1&u='+encodeURIComponent(location.href),'_blank');}})();" title="Sleep naar je favorietenbalk en klik tijdens het shoppen.">
-        ➕ Gebruik onze bookmarklet
-    </a>
-    """, unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    components.html(f"""
+<!doctype html><html><head><meta charset="utf-8"/>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+  body{{margin:0}}
+  .hero{{background:#fff;border:1px solid #EFEBFF;border-radius:22px;
+        box-shadow:0 16px 40px rgba(23,0,75,.18);padding:22px;margin-top:8px;
+        font-family:Inter,system-ui}}
+  .hero-title{{font:800 34px/1.2 Inter,system-ui;color:#1f2358;letter-spacing:-.02em;margin:0 0 14px}}
+  .row{{display:flex;gap:12px;align-items:center}}
+  .inp{{flex:1;background:#fff;border:1px solid #E3E6FF;border-radius:14px;height:52px;
+        padding:0 14px;font:500 16px Inter,system-ui;outline:none}}
+  .inp:focus{{border-color:#8C72FF;box-shadow:0 0 0 3px rgba(140,114,255,.20)}}
+  .btn{{border:0;border-radius:14px;padding:14px 20px;font:800 16px Inter,system-ui;cursor:pointer;
+        color:#fff;background:linear-gradient(180deg,#8C72FF 0%,#6F5BFF 100%);
+        box-shadow:0 12px 28px rgba(23,0,75,.35)}}
+  .chip{{display:inline-flex;align-items:center;gap:8px;margin-top:12px;padding:10px 14px;border-radius:12px;
+         background:rgba(255,255,255,.70);border:1px solid rgba(255,255,255,.85);
+         color:#2d2a6c;text-decoration:none;font:700 14px Inter,system-ui}}
+</style>
+<div class="hero">
+  <div class="hero-title">Plak een productlink en krijg direct stijl-advies</div>
+  <div class="row">
+    <input id="hero-url" class="inp" type="text" placeholder="https://…" value="{html_escape(link_prefill)}"/>
+    <button class="btn" onclick="
+      const v=document.getElementById('hero-url').value.trim();
+      if(v && /^https?:\\/\\//i.test(v)){{
+        const u=new URL(window.parent.location.href);
+        u.searchParams.set('auto','1'); u.searchParams.set('u',v);
+        window.parent.location=u.toString();
+      }} else {{ alert('Plak eerst een geldige URL (https://...)'); }}
+    ">Advies ophalen</button>
+  </div>
+  <a class="chip" href="javascript:(function(){{window.open('{APP_URL}?auto=1&u='+encodeURIComponent(window.location.href),'_blank');}})();">
+    ➕ Gebruik onze bookmarklet
+  </a>
+</div>
+</html>
+""", height=190, scrolling=False)
 
 # ---------- Render kaart 1: advies ----------
 def render_single_card(data: dict, link: str):
@@ -405,10 +383,6 @@ def render_single_card(data: dict, link: str):
     st.markdown(_html_noindent(html), unsafe_allow_html=True)
 
 # ---------- Render kaart 2: bijpassende links + inline CTA ----------
-def _build_link_or_fallback(u: str, query: str):
-    found = _shop_searches(u, query, limit=1)
-    return found[0] if found else _google_fallback(u, query)
-
 def render_matching_links_card(data: dict, link: str):
     pers = data.get("personal_advice", {})
     combine_raw = as_list(pers.get("combine"))
@@ -425,6 +399,7 @@ def render_matching_links_card(data: dict, link: str):
         return
 
     LINK_SVG2 = "<svg viewBox='0 0 24 24'><path d='M3.9 12a5 5 0 015-5h3v2h-3a3 3 0 100 6h3v2h-3a5 5 0 01-5-5zm7-3h3a5 5 0 110 10h-3v-2h3a3 3 0 100-6h-3V9z'/></svg>"
+
     buttons = []
     for q in queries:
         url = _build_link_or_fallback(link, q)
@@ -452,20 +427,17 @@ def render_matching_links_card(data: dict, link: str):
     st.markdown(_html_noindent(html), unsafe_allow_html=True)
 
 # ======================= UI FLOW =======================
-def render_header(): ...
-# (header is al boven gedefinieerd; Python laat dubbele definities toe maar we houden er één)
-
-render_header()
 
 # State
 if "last_link" not in st.session_state:
     st.session_state.last_link = ""
 
-# Hero
+# Header + Hero (geïsoleerd → geen extra wit blok erboven)
+render_header()
 prefill = link_qs if (auto and link_qs) else st.session_state.last_link
 render_hero(link_prefill=prefill)
 
-# Actieve link bepalen (na knop → herlaadt met ?auto=1&u=...)
+# Actieve link bepalen (na hero-redirect komt hij via ?auto=1&u=...)
 active_link = link_qs if (auto and link_qs) else st.session_state.last_link
 
 # Render advies
