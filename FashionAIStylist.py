@@ -274,6 +274,17 @@ Schrijfregels:
         return _ensure_schema({}, product_name, keywords)
 
 # ---------- RENDER UI ----------
+def render_compact_header():
+    """Compacte header in exact dezelfde stijl als de advies- en matchingcards."""
+    st.markdown(f"""
+    <div class="card">
+      <div class="card-title">
+        {DRESS_SVG}
+        Fashion AI Stylist
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
 def render_single_card(data: dict, link: str):
     headline = esc(data.get("headline","Advies"))
     pers = data.get("personal_advice", {})
@@ -354,7 +365,7 @@ def render_hero(link_prefill: str = ""):
 
 if panel and link_qs and auto:
     # Compacte header (nieuw)
-    render_compact_header()
+    #render_compact_header()
     # Direct advies + matching
     data = get_advice_json(link_qs)
     render_single_card(data, link_qs)
