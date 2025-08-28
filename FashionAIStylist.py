@@ -1,5 +1,5 @@
-# app.py — Fashion AI Stylist (panel mode + compact header + schema-fix + matching chips)
-import os, re, json
+# app.py — Fashion AI Stylist (panel mode + compact header + schema-fix + matching chips + personal profile)
+import os, re, json, hashlib
 import streamlit as st
 import streamlit.components.v1 as components
 from urllib.parse import urlparse, quote
@@ -79,6 +79,13 @@ li{ margin: 6px 0; }
 .matching .chip svg{ width:16px; height:16px; }
 .matching .note{ color:#6B7280; font-size:13px; margin-top:10px; }
 
+/* Profile tag chips */
+.tagsrow{ display:flex; flex-wrap:wrap; gap:8px; margin: 6px 0 2px; }
+.tag{
+  background:#F7F7FF; border:1px solid #E8E9FF; color:#1f2a5a;
+  padding:6px 10px; border-radius:10px; font-weight:700; font-size:13px;
+}
+
 /* ===== Compacte header voor panel modus ===== */
 body[data-panel="1"] .compact-header{
   background:#ffffffcc; border:1px solid #EFEBFF; border-radius:12px;
@@ -99,6 +106,16 @@ body[data-panel="1"] .card{ padding: 14px !important; border-radius: 16px !impor
 body[data-panel="1"] .card-title{ font-size: 20px !important; margin-bottom: 6px !important; }
 body[data-panel="1"] .section-h{ font-size: 15px !important; margin:10px 0 4px !important; }
 body[data-panel="1"] ul li{ font-size: 14px !important; line-height: 1.35 !important; margin: 3px 0 !important; }
+
+/* ===== Expander (persoonlijke voorkeuren) in kaartstijl ===== */
+[data-testid="stExpander"]{
+  border: 1px solid #EFEBFF; border-radius: 22px; background:#fff;
+  box-shadow: 0 16px 40px rgba(23,0,75,0.18); margin-top: 10px;
+}
+[data-testid="stExpander"] [data-testid="stExpanderToggleIcon"] svg{ color:#6F5BFF; }
+[data-testid="stExpander"] .streamlit-expanderHeader p{
+  font-size: 20px; font-weight: 800; color:#1f2358; margin: 6px 0;
+}
 </style>
 """), unsafe_allow_html=True)
 
@@ -179,6 +196,65 @@ def _queries_from_combine(bullets, max_links=4):
                 return out
     return out
 
+# ---------- Profiel helpers ----------
+DEFAULT_PROFILE = {
+    "doelgroep": "",           # Man / Vrouw / Unisex
+    "maat_boven": "",          # S / M / L / 48 etc.
+    "maat_beneden": "",
+    "lengte_cm": "",
+    "bouw": "",                # slank / gemiddeld / atletisch / breder boven/onder
+    "fit": "",                 # slim / regular / relaxed
+    "huidtint": "",            # koel / neutraal / warm
+    "kleuren": "",             # vrij tekst, bijv. "navy, ecru, olijf"
+    "stijl": "",               # casual / smart casual / sportief / zakelijk
+    "gelegenheid": "",         # dagelijks / werk / feest
+    "comfort": "",             # stretch / ademend / zacht etc.
+    "notities": ""             # vrije tekst
+}
+
+def _profile_summary(profile: dict) -> str:
+    """Compacte, modelvriendelijke samenvatting (korte zinnen, komma-gescheiden)."""
+    p = {**DEFAULT_PROFILE, **(profile or {})}
+    fields = []
+    def add(lbl, key):
+        v = (p.get(key) or "").strip()
+        if v: fields.append(f"{lbl}: {v}")
+    add("Doelgroep", "doelgroep")
+    add("Maat boven", "maat_boven")
+    add("Maat beneden", "maat_beneden")
+    add("Lengte (cm)", "lengte_cm")
+    add("Bouw", "bouw")
+    add("Voorkeursfit", "fit")
+    add("Huidtint", "huidtint")
+    add("Kleuren", "kleuren")
+    add("Stijl", "stijl")
+    add("Gelegenheid", "gelegenheid")
+    add("Comfort", "comfort")
+    add("Notities", "notities")
+    return "; ".join(fields)
+
+def _profile_tags(profile: dict):
+    """Maak compacte tags voor weergave."""
+    p = {**DEFAULT_PROFILE, **(profile or {})}
+    tags = []
+    for key in ["doelgroep","fit","bouw","stijl","gelegenheid","huidtint"]:
+        v = (p.get(key) or "").strip()
+        if v: tags.append(v)
+    # voeg maten/kleur samen als korte tags
+    if (p.get("maat_boven") or "").strip():
+        tags.append(f"Boven: {p['maat_boven'].strip()}")
+    if (p.get("maat_beneden") or "").strip():
+        tags.append(f"Beneden: {p['maat_beneden'].strip()}")
+    if (p.get("kleuren") or "").strip():
+        k = p["kleuren"].split(",")[0].strip()
+        if k: tags.append(f"Kleur: {k}")
+    return tags
+
+def _profile_hash(profile: dict) -> str:
+    """Voor cache key: hash van het samengevat profiel."""
+    txt = _profile_summary(profile)
+    return hashlib.sha256(txt.encode("utf-8")).hexdigest()[:16]
+
 # ---------- Schema & failsafe ----------
 SCHEMA_HINT = {
   "headline": "max 8 woorden samenvatting",
@@ -233,16 +309,24 @@ def _ensure_schema(data: dict, product_name: str, keywords: str) -> dict:
     pers["combine"] = _coerce_list(pers.get("combine"), 2, defaults["combine"])
     return data
 
-# ---------- LLM call (cached + strict schema) ----------
+# ---------- LLM call (cached + strict schema + profile) ----------
 @st.cache_data(ttl=3600, show_spinner=False)
-def get_advice_json(link: str) -> dict:
+def get_advice_json(link: str, profile: dict) -> dict:
     product_name = _product_name(link)
     keywords     = _keywords_from_url(link)
+    prof_summary = _profile_summary(profile)
+    prof_hash    = _profile_hash(profile)
 
     system_msg = (
         "Je bent een modieuze maar praktische personal stylist. "
         "Schrijf in helder Nederlands (B1), kort en concreet. "
-        "Wees eerlijk over onzekerheid en speculeer niet."
+        "Wees eerlijk over onzekerheid en speculeer niet. "
+        "Respecteer het schema en beperk je tot zekere, generieke adviezen."
+    )
+
+    profile_note = (
+        f"\nPersoonlijke voorkeuren (kort): {prof_summary}\n"
+        if prof_summary else "\n"
     )
 
     user_msg = f"""
@@ -250,14 +334,17 @@ Analyseer dit product uitsluitend op basis van de URL-naam/keywords.
 URL: {link}
 Vermoedelijke productnaam: {product_name}
 Keywords: {keywords}
-
-Geef ALLEEN JSON met exact deze velden (geen extra velden):
+{profile_note}
+OPDRACHT:
+- Houd expliciet rekening met relevante persoonlijke voorkeuren (fit/bouw/kleuren/gelegenheid), voor zover van toepassing.
+- Geef ALLEEN JSON met exact deze velden (geen extra velden):
 {json.dumps(SCHEMA_HINT, ensure_ascii=False)}
 
 Schrijfregels:
 - Alleen stijl-advies dat je ZEKER kunt geven zonder productdetails te raden.
 - Max 8–10 woorden per bullet, geen emoji of merknamen.
-- Maak elk punt persoonlijk en praktisch (comfort, pasvorm, kleur).
+- Maak elk punt praktisch (comfort, pasvorm, kleur, combineren).
+- Als kleuren/fit in profiel staan: laat die voorkeur terugkomen.
 """
 
     try:
@@ -269,9 +356,62 @@ Schrijfregels:
             temperature=0.3, max_tokens=450,
         )
         raw = json.loads(resp.choices[0].message.content)
-        return _ensure_schema(raw, product_name, keywords)
+        # voeg cache-stabiliteit door prof_hash (onzichtbaar in data; alleen voor cache key)
+        data = _ensure_schema(raw, product_name, keywords)
+        data["_cache_key"] = prof_hash  # zit alleen in cache, niet gebruikt bij render
+        return data
     except Exception:
-        return _ensure_schema({}, product_name, keywords)
+        data = _ensure_schema({}, product_name, keywords)
+        data["_cache_key"] = prof_hash
+        return data
+
+# ---------- UI: Persoonlijke voorkeuren ----------
+def render_profile_expander():
+    st.markdown("")  # kleine spacer
+    with st.expander("Vertel iets over jezelf (persoonlijke voorkeuren)"):
+        if "profile" not in st.session_state:
+            st.session_state.profile = DEFAULT_PROFILE.copy()
+        p = st.session_state.profile
+
+        with st.form("profile_form", clear_on_submit=False):
+            c1, c2, c3 = st.columns([1,1,1])
+            with c1:
+                p["doelgroep"] = st.selectbox("Doelgroep", ["","Man","Vrouw","Unisex"], index=["","Man","Vrouw","Unisex"].index(p.get("doelgroep","") or ""))
+                p["fit"]       = st.selectbox("Voorkeursfit", ["","Slim","Regular","Relaxed"], index=["","Slim","Regular","Relaxed"].index(p.get("fit","") or ""))
+                p["bouw"]      = st.selectbox("Lichaamsbouw", ["","Slank","Gemiddeld","Atletisch","Bredere schouders","Bredere heupen"], index=["","Slank","Gemiddeld","Atletisch","Bredere schouders","Bredere heupen"].index(p.get("bouw","") or ""))
+            with c2:
+                p["maat_boven"]   = st.text_input("Maat boven (bijv. M / 48)", p.get("maat_boven",""))
+                p["maat_beneden"] = st.text_input("Maat beneden (bijv. 32/32)", p.get("maat_beneden",""))
+                p["lengte_cm"]    = st.text_input("Lengte (cm)", p.get("lengte_cm",""))
+            with c3:
+                p["huidtint"]   = st.selectbox("Huidtint", ["","Koel","Neutraal","Warm"], index=["","Koel","Neutraal","Warm"].index(p.get("huidtint","") or ""))
+                p["kleuren"]    = st.text_input("Kleurvoorkeuren (comma-sep.)", p.get("kleuren",""))
+                p["stijl"]      = st.selectbox("Stijl", ["","Casual","Smart casual","Sportief","Zakelijk"], index=["","Casual","Smart casual","Sportief","Zakelijk"].index(p.get("stijl","") or ""))
+            c4, c5 = st.columns([1,1])
+            with c4:
+                p["gelegenheid"] = st.selectbox("Gelegenheid", ["","Dagelijks","Werk","Feest"], index=["","Dagelijks","Werk","Feest"].index(p.get("gelegenheid","") or ""))
+            with c5:
+                p["comfort"]     = st.text_input("Comfort (bv. stretch, ademend)", p.get("comfort",""))
+            p["notities"] = st.text_area("Notities (optioneel)", p.get("notities",""), height=70)
+
+            b1, b2 = st.columns([1,1])
+            save = b1.form_submit_button("Opslaan")
+            clear = b2.form_submit_button("Wissen")
+
+            if save:
+                st.session_state.profile = {k: (v or "").strip() for k, v in p.items()}
+                st.success("Voorkeuren opgeslagen.")
+            if clear:
+                st.session_state.profile = DEFAULT_PROFILE.copy()
+                st.info("Voorkeuren gewist.")
+
+        # Toon mini-tags onder de expander (visueel overzicht)
+        tags = _profile_tags(st.session_state.profile)
+        if tags:
+            st.markdown(
+                '<div class="tagsrow">' + "".join([f'<span class="tag">{esc(t)}</span>' for t in tags]) + '</div>',
+                unsafe_allow_html=True
+            )
 
 # ---------- RENDER UI ----------
 def render_compact_header():
@@ -285,17 +425,25 @@ def render_compact_header():
     </div>
     """, unsafe_allow_html=True)
 
-def render_single_card(data: dict, link: str):
+def render_single_card(data: dict, link: str, profile: dict):
     headline = esc(data.get("headline","Advies"))
     pers = data.get("personal_advice", {})
     for_you = as_list(pers.get("for_you"))[:3]
     avoid   = as_list(pers.get("avoid"))[:2]
     colors  = as_list(pers.get("colors"))[:2]
     combine = as_list(pers.get("combine"))[:2]
+    tags = _profile_tags(profile)
+
+    # Optioneel: toon korte profiel-tags bovenaan de kaart
+    tags_html = ""
+    if tags:
+        tags_html = '<div class="tagsrow">' + "".join([f'<span class="tag">{esc(t)}</span>' for t in tags]) + '</div>'
+
     st.markdown(f"""
 <div class="card">
   <div class="card-title">{DRESS_SVG} {headline}</div>
   <div class="card-sub">
+    {tags_html}
     <div class="section-h">• Specifiek advies voor jou</div>
     <ul>{''.join([f"<li>{esc(x)}</li>" for x in for_you])}</ul>
     <div class="section-h">• Kleur & combineren</div>
@@ -364,15 +512,19 @@ def render_hero(link_prefill: str = ""):
 # ======================= MAIN FLOW =======================
 
 if panel and link_qs and auto:
-    # Compacte header (nieuw)
-    #render_compact_header()
-    # Direct advies + matching
-    data = get_advice_json(link_qs)
-    render_single_card(data, link_qs)
+    # Compacte header uit indien gewenst
+    # render_compact_header()
+
+    # 1) Persoonlijk-profiel (uitklapbare wolk)
+    render_profile_expander()
+
+    # 2) Direct advies + matching
+    data = get_advice_json(link_qs, st.session_state.get("profile", DEFAULT_PROFILE))
+    render_single_card(data, link_qs, st.session_state.get("profile", DEFAULT_PROFILE))
     render_matching_links_card(data, link_qs)
 
 else:
-    # Normale modus: header + hero, daarna advies
+    # Normale modus: header + profielwolk + hero, daarna advies
     components.html("""
     <div style="display:flex;align-items:center;gap:14px;margin:10px 0 8px;color:#fff;">
       <svg width="40" height="40" viewBox="0 0 24 24" fill="#fff" xmlns="http://www.w3.org/2000/svg"><path d="M8 3l1.5 3-2 3 2 11h5l2-11-2-3L16 3h-2l-1 2-1-2H8z"/></svg>
@@ -380,14 +532,19 @@ else:
     </div>
     """, height=70)
 
+    # 1) Persoonlijk-profiel (uitklapbare wolk)
+    render_profile_expander()
+
+    # 2) Hero (URL invoer)
     if "last_link" not in st.session_state:
         st.session_state.last_link = ""
     prefill = link_qs if (auto and link_qs) else st.session_state.last_link
     render_hero(prefill)
 
+    # 3) Advies + matching wanneer link actief
     active_link = link_qs if (auto and link_qs) else st.session_state.last_link
     if active_link:
         st.session_state.last_link = active_link
-        data = get_advice_json(active_link)
-        render_single_card(data, active_link)
+        data = get_advice_json(active_link, st.session_state.get("profile", DEFAULT_PROFILE))
+        render_single_card(data, active_link, st.session_state.get("profile", DEFAULT_PROFILE))
         render_matching_links_card(data, active_link)
