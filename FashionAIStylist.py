@@ -388,6 +388,8 @@ def render_profile_expander():
                 p["gelegenheid"] = st.selectbox("Gelegenheid", ["","Dagelijks","Werk","Feest"],
                                                 index=["","Dagelijks","Werk","Feest"].index(p.get("gelegenheid","") or ""))
 
+            b1, b2 = st.columns([1,1])
+            save = b1.form_submit_button("Opslaan")
 
             if save:
                 st.session_state.profile = {k: (v or "").strip() for k, v in p.items()}
