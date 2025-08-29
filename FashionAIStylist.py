@@ -207,8 +207,7 @@ DEFAULT_PROFILE = {
     "huidtint": "",
     "stijl": "",
     "gelegenheid": "",
-    "comfort": "",
-    "notities": ""
+    "Aanvullingen": ""
 }
 
 def _profile_summary(profile: dict) -> str:
@@ -226,7 +225,6 @@ def _profile_summary(profile: dict) -> str:
     add("Huidtint", "huidtint")
     add("Stijl", "stijl")
     add("Gelegenheid", "gelegenheid")
-    add("Comfort", "comfort")
     add("Notities", "notities")
     return "; ".join(fields)
 
@@ -389,13 +387,7 @@ def render_profile_expander():
             with c4:
                 p["gelegenheid"] = st.selectbox("Gelegenheid", ["","Dagelijks","Werk","Feest"],
                                                 index=["","Dagelijks","Werk","Feest"].index(p.get("gelegenheid","") or ""))
-            with c5:
-                p["comfort"]     = st.text_input("Comfort (bv. stretch, ademend)", p.get("comfort",""))
-            p["notities"] = st.text_area("Notities (optioneel)", p.get("notities",""), height=70)
 
-            b1, b2 = st.columns([1,1])
-            save = b1.form_submit_button("Opslaan")
-            clear = b2.form_submit_button("Wissen")
 
             if save:
                 st.session_state.profile = {k: (v or "").strip() for k, v in p.items()}
