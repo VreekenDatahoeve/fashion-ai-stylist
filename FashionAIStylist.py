@@ -198,16 +198,18 @@ def _queries_from_combine(bullets, max_links=4):
 
 # ---------- Profiel helpers ----------
 DEFAULT_PROFILE = {
-    "Geslacht": "",
+    "doelgroep": "",
     "maat_boven": "",
     "maat_beneden": "",
     "lengte_cm": "",
     "bouw": "",
     "fit": "",
     "huidtint": "",
+    "kleuren": "",
     "stijl": "",
     "gelegenheid": "",
-    "Aanvullingen": ""
+    "comfort": "",
+    "notities": ""
 }
 
 def _profile_summary(profile: dict) -> str:
@@ -223,8 +225,10 @@ def _profile_summary(profile: dict) -> str:
     add("Bouw", "bouw")
     add("Voorkeursfit", "fit")
     add("Huidtint", "huidtint")
+    add("Kleuren", "kleuren")
     add("Stijl", "stijl")
     add("Gelegenheid", "gelegenheid")
+    add("Comfort", "comfort")
     add("Notities", "notities")
     return "; ".join(fields)
 
@@ -317,8 +321,7 @@ def get_advice_json(link: str, profile: dict) -> dict:
     )
 
     profile_note = (
-        f"\nPersoonlijke voorkeuren (kort): {prof_summary}\n"
-        if prof_summary else "\n"
+        f"\nPersoonlijke voorkeuren (kort): {prof_summary}\n" if prof_summary else "\n"
     )
 
     user_msg = f"""
@@ -381,15 +384,20 @@ def render_profile_expander():
             with c3:
                 p["huidtint"]   = st.selectbox("Huidtint", ["","Koel","Neutraal","Warm"],
                                                index=["","Koel","Neutraal","Warm"].index(p.get("huidtint","") or ""))
+                p["kleuren"]    = st.text_input("Kleurvoorkeuren (comma-sep.)", p.get("kleuren",""))
                 p["stijl"]      = st.selectbox("Stijl", ["","Casual","Smart casual","Sportief","Zakelijk"],
                                                index=["","Casual","Smart casual","Sportief","Zakelijk"].index(p.get("stijl","") or ""))
             c4, c5 = st.columns([1,1])
             with c4:
                 p["gelegenheid"] = st.selectbox("Gelegenheid", ["","Dagelijks","Werk","Feest"],
                                                 index=["","Dagelijks","Werk","Feest"].index(p.get("gelegenheid","") or ""))
+            with c5:
+                p["comfort"] = st.text_input("Comfort (bv. stretch, ademend)", p.get("comfort",""))
+            p["notities"] = st.text_area("Notities (optioneel)", p.get("notities",""), height=70)
 
             b1, b2 = st.columns([1,1])
-            save = b1.form_submit_button("Opslaan")
+            save  = b1.form_submit_button("Opslaan")
+            clear = b2.form_submit_button("Wissen")
 
             if save:
                 st.session_state.profile = {k: (v or "").strip() for k, v in p.items()}
@@ -410,8 +418,7 @@ def render_compact_header():
     st.markdown(
         '<div class="card"><div class="card-title">'
         f'{DRESS_SVG} Fashion AI Stylist'
-        '</div></div>',
-        unsafe_allow_html=True
+        '</div></div>', unsafe_allow_html=True
     )
 
 def render_single_card(data: dict, link: str, profile: dict):
@@ -427,7 +434,6 @@ def render_single_card(data: dict, link: str, profile: dict):
     if tags:
         tags_html = '<div class="tagsrow">' + "".join([f'<span class="tag">{esc(t)}</span>' for t in tags]) + '</div>'
 
-    # BELANGRIJK: GEEN INSPrINGING vóór HTML-tags (anders ziet Markdown het als codeblok)
     html = (
         '<div class="card">'
         f'<div class="card-title">{DRESS_SVG} {headline}</div>'
