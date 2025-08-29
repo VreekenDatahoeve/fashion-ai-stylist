@@ -370,30 +370,47 @@ def render_profile_expander():
         with st.form("profile_form", clear_on_submit=False):
             c1, c2, c3 = st.columns([1,1,1])
             with c1:
-                p["doelgroep"] = st.selectbox("Doelgroep", ["","Man","Vrouw","Unisex"],
-                                              index=["","Man","Vrouw","Unisex"].index(p.get("doelgroep","") or ""))
-                p["fit"]       = st.selectbox("Voorkeursfit", ["","Slim","Regular","Relaxed"],
-                                              index=["","Slim","Regular","Relaxed"].index(p.get("fit","") or ""))
-                p["bouw"]      = st.selectbox("Lichaamsbouw",
-                                              ["","Slank","Gemiddeld","Atletisch","Bredere schouders","Bredere heupen"],
-                                              index=["","Slank","Gemiddeld","Atletisch","Bredere schouders","Bredere heupen"].index(p.get("bouw","") or ""))
+                p["doelgroep"] = st.selectbox(
+                    "Doelgroep", ["","Man","Vrouw","Unisex"],
+                    index=["","Man","Vrouw","Unisex"].index(p.get("doelgroep","") or ""),
+                    key="form_doelgroep"
+                )
+                p["fit"] = st.selectbox(
+                    "Voorkeursfit", ["","Slim","Regular","Relaxed"],
+                    index=["","Slim","Regular","Relaxed"].index(p.get("fit","") or ""),
+                    key="form_fit"
+                )
+                p["bouw"] = st.selectbox(
+                    "Lichaamsbouw", ["","Slank","Gemiddeld","Atletisch","Bredere schouders","Bredere heupen"],
+                    index=["","Slank","Gemiddeld","Atletisch","Bredere schouders","Bredere heupen"].index(p.get("bouw","") or ""),
+                    key="form_bouw"
+                )
             with c2:
-                p["maat_boven"]   = st.text_input("Maat boven (bijv. M / 48)", p.get("maat_boven",""))
-                p["maat_beneden"] = st.text_input("Maat beneden (bijv. 32/32)", p.get("maat_beneden",""))
-                p["lengte_cm"]    = st.text_input("Lengte (cm)", p.get("lengte_cm",""))
+                p["maat_boven"]   = st.text_input("Maat boven (bijv. M / 48)", p.get("maat_boven",""), key="form_maat_boven")
+                p["maat_beneden"] = st.text_input("Maat beneden (bijv. 32/32)", p.get("maat_beneden",""), key="form_maat_beneden")
+                p["lengte_cm"]    = st.text_input("Lengte (cm)", p.get("lengte_cm",""), key="form_lengte_cm")
             with c3:
-                p["huidtint"]   = st.selectbox("Huidtint", ["","Koel","Neutraal","Warm"],
-                                               index=["","Koel","Neutraal","Warm"].index(p.get("huidtint","") or ""))
-                p["kleuren"]    = st.text_input("Kleurvoorkeuren (comma-sep.)", p.get("kleuren",""))
-                p["stijl"]      = st.selectbox("Stijl", ["","Casual","Smart casual","Sportief","Zakelijk"],
-                                               index=["","Casual","Smart casual","Sportief","Zakelijk"].index(p.get("stijl","") or ""))
+                p["huidtint"] = st.selectbox(
+                    "Huidtint", ["","Koel","Neutraal","Warm"],
+                    index=["","Koel","Neutraal","Warm"].index(p.get("huidtint","") or ""),
+                    key="form_huidtint"
+                )
+                p["kleuren"] = st.text_input("Kleurvoorkeuren (comma-sep.)", p.get("kleuren",""), key="form_kleuren")
+                p["stijl"]   = st.selectbox(
+                    "Stijl", ["","Casual","Smart casual","Sportief","Zakelijk"],
+                    index=["","Casual","Smart casual","Sportief","Zakelijk"].index(p.get("stijl","") or ""),
+                    key="form_stijl"
+                )
             c4, c5 = st.columns([1,1])
             with c4:
-                p["gelegenheid"] = st.selectbox("Gelegenheid", ["","Dagelijks","Werk","Feest"],
-                                                index=["","Dagelijks","Werk","Feest"].index(p.get("gelegenheid","") or ""))
+                p["gelegenheid"] = st.selectbox(
+                    "Gelegenheid", ["","Dagelijks","Werk","Feest"],
+                    index=["","Dagelijks","Werk","Feest"].index(p.get("gelegenheid","") or ""),
+                    key="form_gelegenheid"
+                )
             with c5:
-                p["comfort"] = st.text_input("Comfort (bv. stretch, ademend)", p.get("comfort",""))
-            p["notities"] = st.text_area("Notities (optioneel)", p.get("notities",""), height=70)
+                p["comfort"] = st.text_input("Comfort (bv. stretch, ademend)", p.get("comfort",""), key="form_comfort")
+            p["notities"] = st.text_area("Notities (optioneel)", p.get("notities",""), height=70, key="form_notities")
 
             b1, b2 = st.columns([1,1])
             save  = b1.form_submit_button("Opslaan")
@@ -402,10 +419,18 @@ def render_profile_expander():
             if save:
                 st.session_state.profile = {k: (v or "").strip() for k, v in p.items()}
                 st.success("Voorkeuren opgeslagen.")
-            if clear:
-                st.session_state.profile = DEFAULT_PROFILE.copy()
-                st.info("Voorkeuren gewist.")
 
+            if clear:
+                # reset state
+                st.session_state.profile = DEFAULT_PROFILE.copy()
+                # reset alle form velden
+                for k in list(st.session_state.keys()):
+                    if k.startswith("form_"):
+                        st.session_state[k] = ""
+                st.info("Voorkeuren gewist.")
+                st.rerun()   # forceer rerun zodat velden ook visueel leeg worden
+
+        # tags laten zien
         tags = _profile_tags(st.session_state.profile)
         if tags:
             st.markdown(
