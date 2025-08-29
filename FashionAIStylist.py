@@ -198,14 +198,13 @@ def _queries_from_combine(bullets, max_links=4):
 
 # ---------- Profiel helpers ----------
 DEFAULT_PROFILE = {
-    "doelgroep": "",
+    "Geslacht": "",
     "maat_boven": "",
     "maat_beneden": "",
     "lengte_cm": "",
     "bouw": "",
     "fit": "",
     "huidtint": "",
-    "kleuren": "",
     "stijl": "",
     "gelegenheid": "",
     "comfort": "",
@@ -225,7 +224,6 @@ def _profile_summary(profile: dict) -> str:
     add("Bouw", "bouw")
     add("Voorkeursfit", "fit")
     add("Huidtint", "huidtint")
-    add("Kleuren", "kleuren")
     add("Stijl", "stijl")
     add("Gelegenheid", "gelegenheid")
     add("Comfort", "comfort")
@@ -385,7 +383,6 @@ def render_profile_expander():
             with c3:
                 p["huidtint"]   = st.selectbox("Huidtint", ["","Koel","Neutraal","Warm"],
                                                index=["","Koel","Neutraal","Warm"].index(p.get("huidtint","") or ""))
-                p["kleuren"]    = st.text_input("Kleurvoorkeuren (comma-sep.)", p.get("kleuren",""))
                 p["stijl"]      = st.selectbox("Stijl", ["","Casual","Smart casual","Sportief","Zakelijk"],
                                                index=["","Casual","Smart casual","Sportief","Zakelijk"].index(p.get("stijl","") or ""))
             c4, c5 = st.columns([1,1])
